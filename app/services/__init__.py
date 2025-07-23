@@ -1,1 +1,0 @@
-"""Merculy Backend Module"""
