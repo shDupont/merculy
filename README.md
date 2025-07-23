@@ -92,7 +92,8 @@ O Merculy Backend é uma API REST desenvolvida em Flask que oferece:
 cd merculy-backend
 
 # Ative o ambiente virtual
-source venv/bin/activate
+py -3 -m venv .venv
+.venv\Scripts\activate
 
 # Instale as dependências
 pip install -r requirements.txt
