@@ -40,22 +40,18 @@ class CosmosService:
             {
                 'id': 'users',
                 'partition_key': PartitionKey(path="/email"),
-                'offer_throughput': 400
             },
             {
                 'id': 'newsletters',
                 'partition_key': PartitionKey(path="/user_id"),
-                'offer_throughput': 400
             },
             {
                 'id': 'news_articles',
                 'partition_key': PartitionKey(path="/topic"),
-                'offer_throughput': 400
             },
             {
                 'id': 'user_preferences',
                 'partition_key': PartitionKey(path="/user_id"),
-                'offer_throughput': 400
             }
         ]
         
@@ -64,7 +60,6 @@ class CosmosService:
                 self.database.create_container_if_not_exists(
                     id=container_config['id'],
                     partition_key=container_config['partition_key'],
-                    offer_throughput=container_config['offer_throughput']
                 )
             except exceptions.CosmosResourceExistsError:
                 pass
