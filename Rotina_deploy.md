@@ -70,3 +70,12 @@ az webapp show --name merculy-app --resource-group merculy-rg --query state
 az webapp stop --name merculy-app --resource-group merculy-rg
 az webapp start --name merculy-app --resource-group merculy-rg
 ```
+
+### 10. (Opcional) Pegue o host do serviço
+```bash
+# Get the default hostname/URL of your deployed app
+az webapp show --name merculy-backend --resource-group merculy-rg --query "defaultHostName" --output tsv
+
+# Get the full app URL with HTTPS
+az webapp show --name merculy-backend --resource-group merculy-rg --query "hostNames[0]" --output tsv
+```

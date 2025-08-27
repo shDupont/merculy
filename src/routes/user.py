@@ -1,39 +1,110 @@
 from flask import Blueprint, jsonify, request
-from src.models.user import User, db
+from flask_login import login_required, current_user
+from src.services.user_service import user_service
 
 user_bp = Blueprint('user', __name__)
 
 @user_bp.route('/users', methods=['GET'])
+@login_required
 def get_users():
-    users = User.query.all()
-    return jsonify([user.to_dict() for user in users])
+    """Get all users (admin functionality)"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        users = user_service.get_all_users(limit)
+        return jsonify([user.to_dict() for user in users]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @user_bp.route('/users', methods=['POST'])
+@login_required
 def create_user():
-    
-    data = request.json
-    user = User(username=data['username'], email=data['email'])
-    db.session.add(user)
-    db.session.commit()
-    return jsonify(user.to_dict()), 201
+    """Create a new user (admin functionality)"""
+    try:
+        data = request.json
+        
+        if not data or not data.get('email') or not data.get('name'):
+            return jsonify({'error': 'Email and name are required'}), 400
+        
+        user = user_service.create_user(
+            email=data['email'],
+            name=data['name'],
+            password=data.get('password'),
+            interests=data.get('interests', []),
+            newsletter_format=data.get('newsletter_format', 'single'),
+            delivery_schedule=data.get('delivery_schedule')
+        )
+        
+        if not user:
+            return jsonify({'error': 'Failed to create user or user already exists'}), 409
+        
+        return jsonify(user.to_dict()), 201
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-@user_bp.route('/users/<int:user_id>', methods=['GET'])
+@user_bp.route('/users/<user_id>', methods=['GET'])
+@login_required
 def get_user(user_id):
-    user = User.query.get_or_404(user_id)
-    return jsonify(user.to_dict())
+    """Get user by ID"""
+    try:
+        user = user_service.get_user_by_id(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        return jsonify(user.to_dict()), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-@user_bp.route('/users/<int:user_id>', methods=['PUT'])
+@user_bp.route('/users/<user_id>', methods=['PUT'])
+@login_required
 def update_user(user_id):
-    user = User.query.get_or_404(user_id)
-    data = request.json
-    user.username = data.get('username', user.username)
-    user.email = data.get('email', user.email)
-    db.session.commit()
-    return jsonify(user.to_dict())
+    """Update user by ID"""
+    try:
+        data = request.json
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Only allow users to update their own profile, or admin functionality
+        if current_user.id != user_id:
+            # Here you could add admin check logic
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        updates = {}
+        if 'name' in data:
+            updates['name'] = data['name']
+        if 'interests' in data:
+            updates['interests'] = data['interests']
+        if 'newsletter_format' in data:
+            updates['newsletter_format'] = data['newsletter_format']
+        if 'delivery_schedule' in data:
+            updates['delivery_schedule'] = data['delivery_schedule']
+        
+        updated_user = user_service.update_user(user_id, **updates)
+        
+        if not updated_user:
+            return jsonify({'error': 'User not found or update failed'}), 404
+        
+        return jsonify(updated_user.to_dict()), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-@user_bp.route('/users/<int:user_id>', methods=['DELETE'])
+@user_bp.route('/users/<user_id>', methods=['DELETE'])
+@login_required
 def delete_user(user_id):
-    user = User.query.get_or_404(user_id)
-    db.session.delete(user)
-    db.session.commit()
-    return '', 204
+    """Delete user by ID"""
+    try:
+        # Only allow users to delete their own profile, or admin functionality
+        if current_user.id != user_id:
+            # Here you could add admin check logic
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        success = user_service.delete_user(user_id)
+        
+        if not success:
+            return jsonify({'error': 'User not found or deletion failed'}), 404
+        
+        return '', 204
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

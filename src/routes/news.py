@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from datetime import datetime
 import json
 
-from src.models.user import db, Newsletter, NewsArticle
+from src.models.cosmos_models import newsletter_service, news_article_service
 from src.services.news_service import news_service
 from src.services.gemini_service import gemini_service
 from src.services.cosmos_service import cosmos_service
@@ -44,27 +44,20 @@ def get_news_by_topic(topic):
             
             processed_articles.append(article)
             
-            # Save to database
-            news_article = NewsArticle(
-                title=article['title'],
-                content=article['content'],
-                summary=article.get('summary', ''),
-                source=article['source'],
-                url=article['url'],
-                topic=topic,
-                political_bias=article.get('political_bias'),
-                published_at=datetime.fromisoformat(article['published_at'].replace('Z', '+00:00'))
-            )
-            
+            # Save to Cosmos DB
             try:
-                db.session.add(news_article)
-                db.session.commit()
-            except:
-                db.session.rollback()
-            
-            # Also save to Cosmos DB if available
-            if cosmos_service.is_available():
-                cosmos_service.create_news_article(article)
+                news_article_service.create_article(
+                    title=article['title'],
+                    content=article['content'],
+                    source=article['source'],
+                    url=article['url'],
+                    topic=topic,
+                    summary=article.get('summary'),
+                    political_bias=article.get('political_bias'),
+                    published_at=article['published_at']
+                )
+            except Exception as e:
+                print(f"Error saving article to Cosmos DB: {e}")
         
         return jsonify({
             'topic': topic,
@@ -150,18 +143,27 @@ def generate_newsletter():
                         newsletter_content += f"""
                         <div style="margin-bottom: 20px;">
                             <h3>{article['title']}</h3>
-                            <p>{article['summary']}</p>
+                            <p>{article.get('summary', 'No summary available')}</p>
                             <p><small>Fonte: {article['source']}</small></p>
                         </div>
                         """
             
-            # Save newsletter
-            newsletter = Newsletter(
+            # Save newsletter using Cosmos DB
+            newsletter = newsletter_service.create_newsletter(
                 user_id=current_user.id,
                 title=f"Newsletter Personalizada - {datetime.now().strftime('%d/%m/%Y')}",
                 content=newsletter_content,
                 topic='personalizada'
             )
+            
+            if not newsletter:
+                return jsonify({'error': 'Failed to create newsletter'}), 500
+            
+            return jsonify({
+                'message': 'Newsletter generated successfully',
+                'newsletter': newsletter.to_dict(),
+                'format': 'single'
+            }), 201
             
         else:
             # Generate newsletter by topic
@@ -176,24 +178,20 @@ def generate_newsletter():
                         topic_content += f"""
                         <div style="margin-bottom: 15px;">
                             <h3>{article['title']}</h3>
-                            <p>{article['summary']}</p>
+                            <p>{article.get('summary', 'No summary available')}</p>
                             <p><small>Fonte: {article['source']}</small></p>
                         </div>
                         """
                 
-                newsletter = Newsletter(
+                newsletter = newsletter_service.create_newsletter(
                     user_id=current_user.id,
                     title=f"Newsletter {topic.title()} - {datetime.now().strftime('%d/%m/%Y')}",
                     content=topic_content,
                     topic=topic
                 )
-                newsletters.append(newsletter)
-            
-            # Save all newsletters
-            for newsletter in newsletters:
-                db.session.add(newsletter)
-            
-            db.session.commit()
+                
+                if newsletter:
+                    newsletters.append(newsletter)
             
             return jsonify({
                 'message': 'Newsletters generated successfully',
@@ -201,26 +199,7 @@ def generate_newsletter():
                 'format': 'by_topic'
             }), 201
         
-        db.session.add(newsletter)
-        db.session.commit()
-        
-        # Also save to Cosmos DB if available
-        if cosmos_service.is_available():
-            cosmos_service.create_newsletter({
-                'user_id': current_user.id,
-                'title': newsletter.title,
-                'content': newsletter.content,
-                'topic': newsletter.topic
-            })
-        
-        return jsonify({
-            'message': 'Newsletter generated successfully',
-            'newsletter': newsletter.to_dict(),
-            'format': 'single'
-        }), 201
-        
     except Exception as e:
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/newsletters', methods=['GET'])
@@ -232,52 +211,48 @@ def get_user_newsletters():
         per_page = request.args.get('per_page', 10, type=int)
         topic = request.args.get('topic')
         
-        query = Newsletter.query.filter_by(user_id=current_user.id)
+        # Calculate offset for pagination
+        limit = per_page
+        all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100)
         
+        # Filter by topic if specified
         if topic:
-            query = query.filter_by(topic=topic)
+            all_newsletters = [n for n in all_newsletters if n.topic == topic]
         
-        newsletters = query.order_by(Newsletter.created_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
+        # Calculate pagination
+        total = len(all_newsletters)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        newsletters = all_newsletters[start_idx:end_idx]
+        
+        total_pages = (total + per_page - 1) // per_page
         
         return jsonify({
-            'newsletters': [n.to_dict() for n in newsletters.items],
-            'total': newsletters.total,
-            'pages': newsletters.pages,
+            'newsletters': [n.to_dict() for n in newsletters],
+            'total': total,
+            'pages': total_pages,
             'current_page': page
         }), 200
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@news_bp.route('/newsletters/<int:newsletter_id>/save', methods=['POST'])
+@news_bp.route('/newsletters/<newsletter_id>/save', methods=['POST'])
 @login_required
 def save_newsletter(newsletter_id):
     """Save/unsave a newsletter"""
     try:
-        newsletter = Newsletter.query.filter_by(
-            id=newsletter_id, 
-            user_id=current_user.id
-        ).first()
+        success = newsletter_service.save_newsletter(newsletter_id, current_user.id)
         
-        if not newsletter:
-            return jsonify({'error': 'Newsletter not found'}), 404
-        
-        newsletter.is_saved = not newsletter.is_saved
-        db.session.commit()
-        
-        # Also update in Cosmos DB if available
-        if cosmos_service.is_available():
-            cosmos_service.save_newsletter(str(newsletter_id), current_user.id)
+        if not success:
+            return jsonify({'error': 'Newsletter not found or operation failed'}), 404
         
         return jsonify({
-            'message': f"Newsletter {'saved' if newsletter.is_saved else 'unsaved'} successfully",
-            'newsletter': newsletter.to_dict()
+            'message': 'Newsletter save status toggled successfully',
+            'newsletter_id': newsletter_id
         }), 200
         
     except Exception as e:
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/newsletters/saved', methods=['GET'])
@@ -285,10 +260,7 @@ def save_newsletter(newsletter_id):
 def get_saved_newsletters():
     """Get user's saved newsletters"""
     try:
-        newsletters = Newsletter.query.filter_by(
-            user_id=current_user.id,
-            is_saved=True
-        ).order_by(Newsletter.created_at.desc()).all()
+        newsletters = newsletter_service.get_saved_newsletters(current_user.id)
         
         return jsonify({
             'newsletters': [n.to_dict() for n in newsletters],
@@ -304,7 +276,7 @@ def get_topic_suggestions():
     """Get topic suggestions based on user history"""
     try:
         # Get user's reading history
-        newsletters = Newsletter.query.filter_by(user_id=current_user.id).limit(20).all()
+        newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=20)
         history = [n.title for n in newsletters]
         
         if gemini_service.is_available():
@@ -320,17 +292,33 @@ def get_topic_suggestions():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@news_bp.route('/articles/<int:article_id>/analyze', methods=['POST'])
+@news_bp.route('/articles/<article_id>/analyze', methods=['POST'])
 @login_required
 def analyze_article(article_id):
     """Analyze article for fake news detection"""
     try:
-        article = NewsArticle.query.get(article_id)
+        # Get article from Cosmos DB
+        articles = news_article_service.get_articles_by_topic("", limit=1)  # This needs improvement
+        article = None
+        
+        # Find article by ID (this is a simplified approach)
+        if cosmos_service.is_available():
+            try:
+                container = cosmos_service.database.get_container_client('news_articles')
+                article_doc = container.read_item(item=article_id, partition_key=None)
+                if article_doc:
+                    article = {
+                        'title': article_doc.get('title'),
+                        'content': article_doc.get('content')
+                    }
+            except:
+                pass
+        
         if not article:
             return jsonify({'error': 'Article not found'}), 404
         
         if gemini_service.is_available():
-            analysis = gemini_service.detect_fake_news(article.title, article.content)
+            analysis = gemini_service.detect_fake_news(article['title'], article['content'])
         else:
             analysis = {
                 "score": 5,

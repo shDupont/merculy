@@ -8,7 +8,7 @@ from flask_login import LoginManager
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-from src.models.user import db, User
+from src.services.user_service import user_service
 from src.routes.user import user_bp
 from src.routes.auth import auth_bp
 from src.routes.news import news_bp
@@ -26,9 +26,6 @@ def create_app():
     # Enable CORS for all routes
     CORS(app, supports_credentials=True)
     
-    # Initialize extensions
-    db.init_app(app)
-    
     # Initialize Flask-Login
     login_manager = LoginManager()
     login_manager.init_app(app)
@@ -38,16 +35,24 @@ def create_app():
     
     @login_manager.user_loader
     def load_user(user_id):
-        return User.query.get(int(user_id))
+        """Load user from Cosmos DB for Flask-Login"""
+        return user_service.get_user_by_id(user_id)
     
     # Register blueprints
     app.register_blueprint(user_bp, url_prefix='/api')
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(news_bp, url_prefix='/api')
     
-    # Create database tables
+    # Initialize Cosmos DB connection (replaces SQLAlchemy table creation)
     with app.app_context():
-        db.create_all()
+        try:
+            # Test Cosmos DB connection
+            if user_service.cosmos_service.is_available():
+                print("✅ Cosmos DB connection successful")
+            else:
+                print("❌ Cosmos DB connection failed - check your configuration")
+        except Exception as e:
+            print(f"❌ Error connecting to Cosmos DB: {e}")
     
     # Health check endpoint
     @app.route('/health')

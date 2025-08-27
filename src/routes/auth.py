@@ -7,7 +7,7 @@ import requests
 import json
 from datetime import datetime
 
-from src.models.user import db, User
+from src.services.user_service import user_service
 from src.config import Config
 
 auth_bp = Blueprint('auth', __name__)
@@ -22,27 +22,22 @@ def register():
             return jsonify({'error': 'Email, password and name are required'}), 400
         
         # Check if user already exists
-        existing_user = User.query.filter_by(email=data['email']).first()
+        existing_user = user_service.get_user_by_email(data['email'])
         if existing_user:
             return jsonify({'error': 'User already exists'}), 409
         
         # Create new user
-        user = User(
+        user = user_service.create_user(
             email=data['email'],
             name=data['name'],
-            password_hash=generate_password_hash(data['password'])
+            password=data['password'],
+            interests=data.get('interests', []),
+            newsletter_format=data.get('newsletter_format', 'single'),
+            delivery_schedule=data.get('delivery_schedule')
         )
         
-        # Set initial preferences if provided
-        if data.get('interests'):
-            user.set_interests(data['interests'])
-        if data.get('newsletter_format'):
-            user.newsletter_format = data['newsletter_format']
-        if data.get('delivery_schedule'):
-            user.set_delivery_schedule(data['delivery_schedule'])
-        
-        db.session.add(user)
-        db.session.commit()
+        if not user:
+            return jsonify({'error': 'Failed to create user'}), 500
         
         login_user(user)
         
@@ -52,7 +47,6 @@ def register():
         }), 201
         
     except Exception as e:
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/login', methods=['POST'])
@@ -64,17 +58,13 @@ def login():
         if not data or not data.get('email') or not data.get('password'):
             return jsonify({'error': 'Email and password are required'}), 400
         
-        user = User.query.filter_by(email=data['email']).first()
+        user = user_service.authenticate_user(data['email'], data['password'])
         
-        if not user or not user.password_hash or not check_password_hash(user.password_hash, data['password']):
+        if not user:
             return jsonify({'error': 'Invalid credentials'}), 401
         
-        if not user.is_active:
-            return jsonify({'error': 'Account is deactivated'}), 401
-        
         # Update last login
-        user.last_login = datetime.utcnow()
-        db.session.commit()
+        user_service.update_last_login(user.id)
         
         login_user(user)
         
@@ -114,30 +104,29 @@ def google_login():
         email = idinfo['email']
         name = idinfo['name']
         
-        # Check if user exists
-        user = User.query.filter_by(google_id=google_id).first()
+        # Check if user exists by Google ID
+        user = user_service.get_user_by_oauth_id(google_id, 'google')
         
         if not user:
             # Check if user exists with same email
-            user = User.query.filter_by(email=email).first()
+            user = user_service.get_user_by_email(email)
             if user:
                 # Link Google account to existing user
+                user_service.update_user(user.id, google_id=google_id)
                 user.google_id = google_id
             else:
                 # Create new user
-                user = User(
+                user = user_service.create_user(
                     email=email,
                     name=name,
                     google_id=google_id
                 )
-                db.session.add(user)
         
-        if not user.is_active:
-            return jsonify({'error': 'Account is deactivated'}), 401
+        if not user:
+            return jsonify({'error': 'Failed to create or retrieve user'}), 500
         
         # Update last login
-        user.last_login = datetime.utcnow()
-        db.session.commit()
+        user_service.update_last_login(user.id)
         
         login_user(user)
         
@@ -147,7 +136,6 @@ def google_login():
         }), 200
         
     except Exception as e:
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/facebook-login', methods=['POST'])
@@ -176,30 +164,29 @@ def facebook_login():
         if not email:
             return jsonify({'error': 'Email permission required from Facebook'}), 400
         
-        # Check if user exists
-        user = User.query.filter_by(facebook_id=facebook_id).first()
+        # Check if user exists by Facebook ID
+        user = user_service.get_user_by_oauth_id(facebook_id, 'facebook')
         
         if not user:
             # Check if user exists with same email
-            user = User.query.filter_by(email=email).first()
+            user = user_service.get_user_by_email(email)
             if user:
                 # Link Facebook account to existing user
+                user_service.update_user(user.id, facebook_id=facebook_id)
                 user.facebook_id = facebook_id
             else:
                 # Create new user
-                user = User(
+                user = user_service.create_user(
                     email=email,
                     name=name,
                     facebook_id=facebook_id
                 )
-                db.session.add(user)
         
-        if not user.is_active:
-            return jsonify({'error': 'Account is deactivated'}), 401
+        if not user:
+            return jsonify({'error': 'Failed to create or retrieve user'}), 500
         
         # Update last login
-        user.last_login = datetime.utcnow()
-        db.session.commit()
+        user_service.update_last_login(user.id)
         
         login_user(user)
         
@@ -209,7 +196,6 @@ def facebook_login():
         }), 200
         
     except Exception as e:
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -232,27 +218,31 @@ def update_profile():
     try:
         data = request.get_json()
         
+        updates = {}
+        
         if data.get('name'):
-            current_user.name = data['name']
+            updates['name'] = data['name']
         
         if data.get('interests'):
-            current_user.set_interests(data['interests'])
+            updates['interests'] = data['interests']
         
         if data.get('newsletter_format'):
-            current_user.newsletter_format = data['newsletter_format']
+            updates['newsletter_format'] = data['newsletter_format']
         
         if data.get('delivery_schedule'):
-            current_user.set_delivery_schedule(data['delivery_schedule'])
+            updates['delivery_schedule'] = data['delivery_schedule']
         
-        db.session.commit()
+        updated_user = user_service.update_user(current_user.id, **updates)
+        
+        if not updated_user:
+            return jsonify({'error': 'Failed to update profile'}), 500
         
         return jsonify({
             'message': 'Profile updated successfully',
-            'user': current_user.to_dict()
+            'user': updated_user.to_dict()
         }), 200
         
     except Exception as e:
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/change-password', methods=['PUT'])
@@ -265,18 +255,19 @@ def change_password():
         if not data.get('current_password') or not data.get('new_password'):
             return jsonify({'error': 'Current password and new password are required'}), 400
         
-        if not current_user.password_hash:
+        if not current_user.passwordHash:
             return jsonify({'error': 'Cannot change password for OAuth-only accounts'}), 400
         
-        if not check_password_hash(current_user.password_hash, data['current_password']):
+        if not check_password_hash(current_user.passwordHash, data['current_password']):
             return jsonify({'error': 'Current password is incorrect'}), 401
         
-        current_user.password_hash = generate_password_hash(data['new_password'])
-        db.session.commit()
+        success = user_service.change_password(current_user.id, data['new_password'])
+        
+        if not success:
+            return jsonify({'error': 'Failed to change password'}), 500
         
         return jsonify({'message': 'Password changed successfully'}), 200
         
     except Exception as e:
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 

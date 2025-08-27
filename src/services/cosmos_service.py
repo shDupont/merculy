@@ -39,7 +39,7 @@ class CosmosService:
         containers = [
             {
                 'id': 'users',
-                'partition_key': PartitionKey(path="/email"),
+                'partition_key': PartitionKey(path="/id"),
             },
             {
                 'id': 'newsletters',
@@ -76,25 +76,8 @@ class CosmosService:
         
         try:
             container = self.database.get_container_client('users')
-            user_doc = {
-                'id': str(user_data.get('id', user_data['email'])),
-                'email': user_data['email'],
-                'name': user_data['name'],
-                'google_id': user_data.get('google_id'),
-                'facebook_id': user_data.get('facebook_id'),
-                'interests': user_data.get('interests', []),
-                'newsletter_format': user_data.get('newsletter_format', 'single'),
-                'delivery_schedule': user_data.get('delivery_schedule', {
-                    'days': ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-                    'time': '08:00'
-                }),
-                'created_at': datetime.utcnow().isoformat(),
-                'last_login': user_data.get('last_login'),
-                'is_active': user_data.get('is_active', True),
-                'type': 'user'
-            }
             
-            return container.create_item(body=user_doc)
+            return container.create_item(body=user_data)
         except Exception as e:
             print(f"Error creating user in Cosmos DB: {e}")
             return None
@@ -106,11 +89,11 @@ class CosmosService:
         
         try:
             container = self.database.get_container_client('users')
-            query = "SELECT * FROM c WHERE c.email = @email AND c.type = 'user'"
+            query = "SELECT * FROM c WHERE c.email = @email"
             items = list(container.query_items(
                 query=query,
                 parameters=[{"name": "@email", "value": email}],
-                partition_key=email
+                enable_cross_partition_query=True
             ))
             return items[0] if items else None
         except Exception as e:
