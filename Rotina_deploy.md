@@ -40,7 +40,7 @@ git commit -m "Add gunicorn to requirements"
 
 ### 6. Faça o push do branch `manus` (ou `main`) para o Azure
 ```bash
-git push azure manus:main
+git push azure manus:master
 ```
 
 ### 7. Configure variáveis de ambiente no Azure Portal
@@ -74,8 +74,16 @@ az webapp start --name merculy-app --resource-group merculy-rg
 ### 10. (Opcional) Pegue o host do serviço
 ```bash
 # Get the default hostname/URL of your deployed app
-az webapp show --name merculy-backend --resource-group merculy-rg --query "defaultHostName" --output tsv
+az webapp show --name merculy-app --resource-group merculy-rg --query "defaultHostName" --output tsv
 
 # Get the full app URL with HTTPS
-az webapp show --name merculy-backend --resource-group merculy-rg --query "hostNames[0]" --output tsv
+az webapp show --name merculy-app --resource-group merculy-rg --query "hostNames[0]" --output tsv
+```
+
+### 11. Deployed Host
+
+```bash
+
+merculy-app-hehte6a4ffc5hqeh.brazilsouth-01.azurewebsites.net
+
 ```
