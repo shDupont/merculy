@@ -104,26 +104,41 @@ def google_login():
         email = idinfo['email']
         name = idinfo['name']
         
+        print(f'[DEBUG] Google OAuth - ID: {google_id}, Email: {email}, Name: {name}')
+
         # Check if user exists by Google ID
         user = user_service.get_user_by_oauth_id(google_id, 'google')
+        print(f'[DEBUG] User found by Google ID: {user is not None}')
         
         if not user:
             # Check if user exists with same email
             user = user_service.get_user_by_email(email)
+            print(f'[DEBUG] User found by email: {user is not None}')
             if user:
                 # Link Google account to existing user
+                print('[DEBUG] Linking Google account to existing user')
                 user_service.update_user(user.id, google_id=google_id)
                 user.google_id = google_id
             else:
                 # Create new user
+                print('[DEBUG] Creating new user with Google OAuth')
                 user = user_service.create_user(
                     email=email,
                     name=name,
                     google_id=google_id
                 )
+                print(f'[DEBUG] User created: {user is not None}')
         
         if not user:
-            return jsonify({'error': 'Failed to create or retrieve user'}), 500
+            print('[DEBUG] FAILED: User is None after all attempts')
+            return jsonify({
+                'error': 'Failed to create or retrieve user',
+                'debug': {
+                    'google_id': google_id,
+                    'email': email,
+                    'cosmos_available': user_service.cosmos_service.is_available()
+                }
+            }), 500
         
         # Update last login
         user_service.update_last_login(user.id)

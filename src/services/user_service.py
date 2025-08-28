@@ -135,10 +135,12 @@ class UserService:
             # Check if user already exists
             existing_user = self.get_user_by_email(email)
             if existing_user:
+                print(f'[DEBUG] User already exists: {email}')
                 return None
             
             # Generate user ID
             user_id = self._generate_user_id(email)
+            print(f'[DEBUG] Generated user ID: {user_id} for email: {email}')
             
             # Create user data
             user_data = {
@@ -157,18 +159,24 @@ class UserService:
                 'created_at': datetime.utcnow().isoformat(),
                 'update_at': datetime.utcnow().isoformat(),
                 'last_login': None,
-                'password_hash': generate_password_hash(password)
+                'password_hash': generate_password_hash(password) if password else None
             }
+            
+            print(f'[DEBUG] User data created: {user_data}')
+            print(f'[DEBUG] Cosmos service available: {self.cosmos_service.is_available()}')
             
             # Save to Cosmos DB
             cosmos_user = self.cosmos_service.create_user(user_data)
+            print(f'[DEBUG] Cosmos user creation result: {cosmos_user is not None}')
             if cosmos_user:
                 return CosmosUser(cosmos_user)
             
             return None
             
         except Exception as e:
-            print(f"Error creating user: {e}")
+            print(f"[ERROR] Error creating user: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_user_by_email(self, email):
