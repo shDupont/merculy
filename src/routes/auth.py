@@ -39,7 +39,7 @@ def register():
         if not user:
             return jsonify({'error': 'Failed to create user'}), 500
         
-        login_user(user)
+        login_user(user, force=True)
         
         return jsonify({
             'message': 'User registered successfully',
@@ -66,7 +66,7 @@ def login():
         # Update last login
         user_service.update_last_login(user.id)
         
-        login_user(user)
+        login_user(user, force=True)
         
         return jsonify({
             'message': 'Login successful',
@@ -143,7 +143,7 @@ def google_login():
         # Update last login
         user_service.update_last_login(user.id)
         
-        login_user(user)
+        login_user(user, force=True)
         
         return jsonify({
             'message': 'Google login successful',
@@ -203,7 +203,7 @@ def facebook_login():
         # Update last login
         user_service.update_last_login(user.id)
         
-        login_user(user)
+        login_user(user, force=True)
         
         return jsonify({
             'message': 'Facebook login successful',
