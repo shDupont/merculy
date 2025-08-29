@@ -3,7 +3,7 @@ import sys
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, send_from_directory, jsonify
+from flask import Flask, jsonify, send_from_directory
 from flask_login import LoginManager
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -23,22 +23,26 @@ def create_app():
     # Configuration
     app.config.from_object(Config)
     
-    # Enable CORS for all routes with credentials support
-    CORS(app, supports_credentials=True, origins=['https://merculy-app-hehte6a4ffc5hqeh.brazilsouth-01.azurewebsites.net', 'http://localhost:3000', 'http://127.0.0.1:3000'])
+    # Enable CORS for all routes
+    CORS(app, supports_credentials=True)
     
     # Initialize Flask-Login
     login_manager = LoginManager()
     login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Please log in to access this page.'
+    login_manager.login_message_category = 'info'
+    
+    @login_manager.user_loader
+    def load_user(user_email):
+        """Load user from Cosmos DB for Flask-Login"""
+        print(f"[DEBUG] user_email: {user_email}")
+        return user_service.get_user_by_email(user_email)
     
     # Configure for API usage (no redirects)
     @login_manager.unauthorized_handler
     def unauthorized():
         return jsonify({'error': 'Authentication required'}), 401
-    
-    @login_manager.user_loader
-    def load_user(user_id):
-        """Load user from Cosmos DB for Flask-Login"""
-        return user_service.get_user_by_id(user_id)
     
     # Register blueprints
     app.register_blueprint(user_bp, url_prefix='/api')
@@ -63,16 +67,6 @@ def create_app():
             'status': 'healthy',
             'message': 'Merculy Backend API is running',
             'version': '1.0.0'
-        }
-    
-    # Session test endpoint
-    @app.route('/api/session-test')
-    def session_test():
-        from flask_login import current_user
-        return {
-            'authenticated': current_user.is_authenticated,
-            'user_id': current_user.id if current_user.is_authenticated else None,
-            'session_info': 'Session working'
         }
     
     # API info endpoint

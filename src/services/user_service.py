@@ -51,7 +51,7 @@ class CosmosUser(UserMixin):
 
     def get_id(self):
         """Return user ID for Flask-Login"""
-        return str(self.id) if self.id else None
+        return str(self.email) if self.email else None
 
     def get_interests(self):
         """Get user interests as a list"""
@@ -245,12 +245,12 @@ class UserService:
             print(f"Error getting user by OAuth ID: {e}")
             return None
     
-    def update_user(self, user_id, **updates):
+    def update_user(self, user_email, **updates):
         """
         Update user in Cosmos DB
         
         Args:
-            user_id (str): User ID
+            user_email (str): User ID
             **updates: Fields to update
             
         Returns:
@@ -258,7 +258,7 @@ class UserService:
         """
         try:
             # Get current user
-            user = self.get_user_by_id(user_id)
+            user = self.get_user_by_email(user_email)
             if not user:
                 return None
             
@@ -278,17 +278,17 @@ class UserService:
             print(f"Error updating user: {e}")
             return None
     
-    def update_last_login(self, user_id):
+    def update_last_login(self, user_email):
         """
         Update user's last login timestamp
         
         Args:
-            user_id (str): User ID
+            user_email (str): User ID
             
         Returns:
             CosmosUser: Updated user object or None if failed
         """
-        return self.update_user(user_id, last_login=datetime.utcnow().isoformat())
+        return self.update_user(user_email, last_login=datetime.utcnow().isoformat())
     
     def authenticate_user(self, email, password):
         """
@@ -304,7 +304,7 @@ class UserService:
         try:
             user = self.get_user_by_email(email)
             print('[AUTH]')
-            print(user)
+            print(user.to_dict.__str__)
             if not user or not user.password_hash:
                 return None
             

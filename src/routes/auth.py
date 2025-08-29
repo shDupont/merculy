@@ -64,7 +64,7 @@ def login():
             return jsonify({'error': 'Invalid credentials'}), 401
         
         # Update last login
-        user_service.update_last_login(user.id)
+        user_service.update_last_login(user.email)
         
         is_logged = login_user(user, force=True)
         
@@ -118,7 +118,7 @@ def google_login():
             if user:
                 # Link Google account to existing user
                 print('[DEBUG] Linking Google account to existing user')
-                user_service.update_user(user.id, google_id=google_id)
+                user_service.update_user(user.email, google_id=google_id)
                 user.google_id = google_id
             else:
                 # Create new user
@@ -142,7 +142,7 @@ def google_login():
             }), 500
         
         # Update last login
-        user_service.update_last_login(user.id)
+        user_service.update_last_login(user.email)
         
         login_user(user, force=True)
         
@@ -188,7 +188,7 @@ def facebook_login():
             user = user_service.get_user_by_email(email)
             if user:
                 # Link Facebook account to existing user
-                user_service.update_user(user.id, facebook_id=facebook_id)
+                user_service.update_user(user.email, facebook_id=facebook_id)
                 user.facebook_id = facebook_id
             else:
                 # Create new user
@@ -202,7 +202,7 @@ def facebook_login():
             return jsonify({'error': 'Failed to create or retrieve user'}), 500
         
         # Update last login
-        user_service.update_last_login(user.id)
+        user_service.update_last_login(user.email)
         
         login_user(user, force=True)
         
@@ -248,7 +248,7 @@ def update_profile():
         if data.get('delivery_schedule'):
             updates['delivery_schedule'] = data['delivery_schedule']
         
-        updated_user = user_service.update_user(current_user.id, **updates)
+        updated_user = user_service.update_user(current_user.email, **updates)
         
         if not updated_user:
             return jsonify({'error': 'Failed to update profile'}), 500
@@ -271,10 +271,10 @@ def change_password():
         if not data.get('current_password') or not data.get('new_password'):
             return jsonify({'error': 'Current password and new password are required'}), 400
         
-        if not current_user.passwordHash:
+        if not current_user.password_hash:
             return jsonify({'error': 'Cannot change password for OAuth-only accounts'}), 400
         
-        if not check_password_hash(current_user.passwordHash, data['current_password']):
+        if not check_password_hash(current_user.password_hash, data['current_password']):
             return jsonify({'error': 'Current password is incorrect'}), 401
         
         success = user_service.change_password(current_user.id, data['new_password'])
