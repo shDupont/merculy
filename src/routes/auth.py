@@ -66,11 +66,12 @@ def login():
         # Update last login
         user_service.update_last_login(user.id)
         
-        login_user(user, force=True)
+        is_logged = login_user(user, force=True)
         
         return jsonify({
             'message': 'Login successful',
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'isLogged': is_logged
         }), 200
         
     except Exception as e:

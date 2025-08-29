@@ -6,6 +6,13 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
+    # Session configuration for better security
+    SESSION_COOKIE_SECURE = os.environ.get('FLASK_ENV') != 'development'  # Use HTTPS in production only
+    SESSION_COOKIE_HTTPONLY = True  # Prevent XSS
+    SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+    REMEMBER_COOKIE_SECURE = os.environ.get('FLASK_ENV') != 'development'
+    REMEMBER_COOKIE_HTTPONLY = True
+    
     # OAuth Configuration
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
