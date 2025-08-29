@@ -80,6 +80,11 @@ az webapp show --name merculy-app --resource-group merculy-rg --query "defaultHo
 az webapp show --name merculy-app --resource-group merculy-rg --query "hostNames[0]" --output tsv
 ```
 
+### 13. Show logs
+```bash
+az webapp log tail --name merculy-app --resource-group merculy-rg
+```
+
 ### 11. Deployed Host
 
 ```bash
