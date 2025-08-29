@@ -108,7 +108,7 @@ class CosmosService:
         try:
             container = self.database.get_container_client('users')
             field = f"{provider}_id"
-            query = f"SELECT * FROM c WHERE c.{field} = @oauth_id AND c.type = 'user'"
+            query = f"SELECT * FROM c WHERE c.{field} = @oauth_id"
             items = list(container.query_items(
                 query=query,
                 parameters=[{"name": "@oauth_id", "value": oauth_id}],
