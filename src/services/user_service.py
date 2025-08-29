@@ -32,6 +32,7 @@ class CosmosUser(UserMixin):
             })
             self.created_at = user_data.get('created_at')
             self.last_login = user_data.get('last_login')
+            self.is_active = True
         else:
             # Initialize empty user
             self.id = None
@@ -48,6 +49,7 @@ class CosmosUser(UserMixin):
             }
             self.created_at = None
             self.last_login = None
+            self.is_active = True
 
     def get_id(self):
         """Return user ID for Flask-Login"""
@@ -82,7 +84,8 @@ class CosmosUser(UserMixin):
             'newsletter_format': self.newsletter_format,
             'delivery_schedule': self.get_delivery_schedule(),
             'created_at': self.created_at,
-            'password_hash': self.password_hash
+            'password_hash': self.password_hash,
+            'is_active': self.is_active
         }
 
     def to_cosmos_dict(self):
