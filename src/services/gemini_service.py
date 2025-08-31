@@ -62,6 +62,38 @@ class GeminiService:
         
         return self._make_request(prompt)
     
+    def generate_bullet_point_highlights(self, title: str, content: str) -> Optional[List[str]]:
+        """Generate bullet point highlights for a news article"""
+        prompt = f"""
+        Crie exatamente 3 bullet points destacando os principais aspectos do seguinte artigo de notícias.
+        Cada bullet point deve ser uma frase concisa e informativa.
+        
+        Título: {title}
+        Conteúdo: {content}
+        
+        Responda APENAS com os 3 bullet points, um por linha, iniciando cada um com "• ":
+        """
+        
+        result = self._make_request(prompt)
+        if result:
+            # Parse the bullet points from the response
+            lines = [line.strip() for line in result.split('\n') if line.strip()]
+            bullet_points = []
+            
+            for line in lines:
+                # Ensure it starts with bullet point
+                if line.startswith('• '):
+                    bullet_points.append(line)
+                elif line.startswith('- ') or line.startswith('* '):
+                    bullet_points.append('• ' + line[2:])
+                elif line and not line.startswith('•'):
+                    bullet_points.append('• ' + line)
+            
+            # Return exactly 3 bullet points
+            return bullet_points[:3] if len(bullet_points) >= 3 else bullet_points
+        
+        return None
+    
     def analyze_political_bias(self, title: str, content: str) -> Optional[str]:
         """Analyze political bias of a news article"""
         prompt = f"""

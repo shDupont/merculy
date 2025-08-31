@@ -277,7 +277,7 @@ def change_password():
         if not check_password_hash(current_user.password_hash, data['current_password']):
             return jsonify({'error': 'Current password is incorrect'}), 401
         
-        success = user_service.change_password(current_user.id, data['new_password'])
+        success = user_service.change_password(current_user.email, data['new_password'])
         
         if not success:
             return jsonify({'error': 'Failed to change password'}), 500

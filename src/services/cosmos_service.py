@@ -154,11 +154,9 @@ class CosmosService:
                 'id': f"{newsletter_data['user_id']}_{datetime.utcnow().timestamp()}",
                 'user_id': newsletter_data['user_id'],
                 'title': newsletter_data['title'],
-                'content': newsletter_data['content'],
                 'topic': newsletter_data.get('topic'),
+                'articles': newsletter_data.get('articles', []),  # List of article IDs
                 'created_at': datetime.utcnow().isoformat(),
-                'sent_at': newsletter_data.get('sent_at'),
-                'is_saved': newsletter_data.get('is_saved', False),
                 'type': 'newsletter'
             }
             
@@ -186,8 +184,8 @@ class CosmosService:
             print(f"Error getting newsletters from Cosmos DB: {e}")
             return []
     
-    def save_newsletter(self, newsletter_id, user_id):
-        """Save/unsave a newsletter"""
+    def get_newsletter_by_id(self, newsletter_id, user_id):
+        """Get newsletter by ID"""
         if not self.is_available():
             return None
         
@@ -203,14 +201,22 @@ class CosmosService:
                 partition_key=str(user_id)
             ))
             
-            if items:
-                newsletter = items[0]
-                newsletter['is_saved'] = not newsletter.get('is_saved', False)
-                return container.replace_item(item=newsletter['id'], body=newsletter)
-            
-            return None
+            return items[0] if items else None
         except Exception as e:
-            print(f"Error saving newsletter in Cosmos DB: {e}")
+            print(f"Error getting newsletter by ID from Cosmos DB: {e}")
+            return None
+    
+    def delete_newsletter(self, newsletter_id, user_id):
+        """Delete a newsletter"""
+        if not self.is_available():
+            return None
+        
+        try:
+            container = self.database.get_container_client('newsletters')
+            container.delete_item(item=newsletter_id, partition_key=str(user_id))
+            return True
+        except Exception as e:
+            print(f"Error deleting newsletter in Cosmos DB: {e}")
             return None
     
     # News articles operations
@@ -226,6 +232,7 @@ class CosmosService:
                 'title': article_data['title'],
                 'content': article_data['content'],
                 'summary': article_data.get('summary'),
+                'bullet_point_highlights': article_data.get('bullet_point_highlights'),
                 'source': article_data['source'],
                 'url': article_data['url'],
                 'topic': article_data['topic'],
@@ -258,6 +265,24 @@ class CosmosService:
         except Exception as e:
             print(f"Error getting news articles from Cosmos DB: {e}")
             return []
+    
+    def get_news_article_by_id(self, article_id):
+        """Get news article by ID from Cosmos DB"""
+        if not self.is_available():
+            return None
+        
+        try:
+            container = self.database.get_container_client('news_articles')
+            query = "SELECT * FROM c WHERE c.id = @article_id AND c.type = 'news_article'"
+            items = list(container.query_items(
+                query=query,
+                parameters=[{"name": "@article_id", "value": article_id}],
+                enable_cross_partition_query=True
+            ))
+            return items[0] if items else None
+        except Exception as e:
+            print(f"Error getting news article by ID from Cosmos DB: {e}")
+            return None
     
     # User preferences operations
     def save_user_preferences(self, user_id, preferences):

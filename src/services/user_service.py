@@ -329,12 +329,12 @@ class UserService:
             print(f"Error authenticating user: {e}")
             return None
     
-    def change_password(self, user_id, new_password):
+    def change_password(self, user_email, new_password):
         """
         Change user password
         
         Args:
-            user_id (str): User ID
+            user_email (str): User Email
             new_password (str): New password
             
         Returns:
@@ -342,7 +342,7 @@ class UserService:
         """
         try:
             password_hash = generate_password_hash(new_password)
-            updated_user = self.update_user(user_id, password_hash=password_hash)
+            updated_user = self.update_user(user_email, password_hash=password_hash)
             return updated_user is not None
         except Exception as e:
             print(f"Error changing password: {e}")
@@ -363,7 +363,7 @@ class UserService:
                 return []
             
             container = self.cosmos_service.database.get_container_client('users')
-            query = "SELECT * FROM c WHERE c.type = 'user' ORDER BY c.created_at DESC"
+            query = "SELECT * FROM c"
             items = list(container.query_items(
                 query=query,
                 enable_cross_partition_query=True,

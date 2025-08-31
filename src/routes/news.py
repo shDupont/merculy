@@ -115,24 +115,35 @@ def get_news_by_topic(topic):
                 if summary:
                     article['summary'] = summary
                 
+                # Generate bullet point highlights
+                bullet_highlights = gemini_service.generate_bullet_point_highlights(article['title'], article['content'])
+                if bullet_highlights:
+                    article['bullet_point_highlights'] = bullet_highlights
+                
                 # Analyze political bias
                 bias = gemini_service.analyze_political_bias(article['title'], article['content'])
                 article['political_bias'] = bias
             
             processed_articles.append(article)
             
-            # Save to Cosmos DB
+            # Save to Cosmos DB and get the created article with ID
             try:
-                news_article_service.create_article(
+                created_article = news_article_service.create_article(
                     title=article['title'],
                     content=article['content'],
                     source=article['source'],
                     url=article['url'],
                     topic=topic,
                     summary=article.get('summary'),
+                    bullet_point_highlights=article.get('bullet_point_highlights'),
                     political_bias=article.get('political_bias'),
                     published_at=article['published_at']
                 )
+                
+                # Add the article ID to the response if creation was successful
+                if created_article and created_article.id:
+                    article['id'] = created_article.id
+                    
             except Exception as e:
                 print(f"Error saving article to Cosmos DB: {e}")
         
@@ -197,24 +208,35 @@ def get_news_by_multiple_topics():
                     if summary:
                         article['summary'] = summary
                     
+                    # Generate bullet point highlights
+                    bullet_highlights = gemini_service.generate_bullet_point_highlights(article['title'], article['content'])
+                    if bullet_highlights:
+                        article['bullet_point_highlights'] = bullet_highlights
+                    
                     # Analyze political bias
                     bias = gemini_service.analyze_political_bias(article['title'], article['content'])
                     article['political_bias'] = bias
                 
                 processed_articles.append(article)
                 
-                # Save to Cosmos DB
+                # Save to Cosmos DB and get the created article with ID
                 try:
-                    news_article_service.create_article(
+                    created_article = news_article_service.create_article(
                         title=article['title'],
                         content=article['content'],
                         source=article['source'],
                         url=article['url'],
                         topic=topic,
                         summary=article.get('summary'),
+                        bullet_point_highlights=article.get('bullet_point_highlights'),
                         political_bias=article.get('political_bias'),
                         published_at=article['published_at']
                     )
+                    
+                    # Add the article ID to the response if creation was successful
+                    if created_article and created_article.id:
+                        article['id'] = created_article.id
+                        
                 except Exception as e:
                     print(f"Error saving article to Cosmos DB: {e}")
             
@@ -339,7 +361,7 @@ def search_news():
 @news_bp.route('/newsletter/generate', methods=['POST'])
 @login_required
 def generate_newsletter():
-    """Generate personalized newsletter for current user"""
+    """Generate personalized newsletter for current user based on article references"""
     try:
         data = request.get_json() or {}
         
@@ -372,37 +394,57 @@ def generate_newsletter():
         if not news_by_topic:
             return jsonify({'error': 'No news articles found for user interests'}), 404
         
-        newsletter_content = ""
-        
         if current_user.newsletter_format == 'single':
             # Generate single newsletter with all topics
             all_articles = []
+            article_ids = []
+            
+            # Process articles and collect IDs
             for topic_articles in news_by_topic.values():
-                all_articles.extend(topic_articles)
+                for article in topic_articles:
+                    # Process article with AI if available
+                    if gemini_service.is_available():
+                        summary = gemini_service.summarize_article(article['title'], article['content'])
+                        if summary:
+                            article['summary'] = summary
+                        
+                        # Generate bullet point highlights
+                        bullet_highlights = gemini_service.generate_bullet_point_highlights(article['title'], article['content'])
+                        if bullet_highlights:
+                            article['bullet_point_highlights'] = bullet_highlights
+                        
+                        # Analyze political bias
+                        bias = gemini_service.analyze_political_bias(article['title'], article['content'])
+                        article['political_bias'] = bias
+                    
+                    all_articles.append(article)
+                    
+                    # Save to Cosmos DB and collect article ID
+                    try:
+                        created_article = news_article_service.create_article(
+                            title=article['title'],
+                            content=article['content'],
+                            source=article['source'],
+                            url=article['url'],
+                            topic=article.get('topic', 'geral'),
+                            summary=article.get('summary'),
+                            bullet_point_highlights=article.get('bullet_point_highlights'),
+                            political_bias=article.get('political_bias'),
+                            published_at=article.get('published_at')
+                        )
+                        
+                        if created_article and created_article.id:
+                            article_ids.append(created_article.id)
+                            
+                    except Exception as e:
+                        print(f"Error saving article to Cosmos DB: {e}")
             
-            if gemini_service.is_available():
-                newsletter_content = gemini_service.generate_newsletter_content(user_interests, all_articles)
-            
-            if not newsletter_content:
-                # Fallback content generation
-                newsletter_content = f"<h1>Newsletter Personalizada - {datetime.now().strftime('%d/%m/%Y')}</h1>"
-                for topic, articles in news_by_topic.items():
-                    newsletter_content += f"<h2>{topic.title()}</h2>"
-                    for article in articles[:3]:
-                        newsletter_content += f"""
-                        <div style="margin-bottom: 20px;">
-                            <h3>{article['title']}</h3>
-                            <p>{article.get('summary', 'No summary available')}</p>
-                            <p><small>Fonte: {article['source']}</small></p>
-                        </div>
-                        """
-            
-            # Save newsletter using Cosmos DB
+            # Create newsletter using the new model
             newsletter = newsletter_service.create_newsletter(
                 user_id=current_user.id,
                 title=f"Newsletter Personalizada - {datetime.now().strftime('%d/%m/%Y')}",
-                content=newsletter_content,
-                topic='personalizada'
+                topic='personalizada',
+                articles=article_ids
             )
             
             if not newsletter:
@@ -410,6 +452,7 @@ def generate_newsletter():
             
             return jsonify({
                 'message': 'Newsletter generated successfully',
+                'newsletter_id': newsletter.id,
                 'newsletter': newsletter.to_dict(),
                 'format': 'single'
             }), 201
@@ -418,25 +461,51 @@ def generate_newsletter():
             # Generate newsletter by topic
             newsletters = []
             for topic, articles in news_by_topic.items():
-                if gemini_service.is_available():
-                    topic_content = gemini_service.generate_newsletter_by_topic(topic, articles)
-                else:
-                    # Fallback content
-                    topic_content = f"<h2>{topic.title()}</h2>"
-                    for article in articles:
-                        topic_content += f"""
-                        <div style="margin-bottom: 15px;">
-                            <h3>{article['title']}</h3>
-                            <p>{article.get('summary', 'No summary available')}</p>
-                            <p><small>Fonte: {article['source']}</small></p>
-                        </div>
-                        """
+                article_ids = []
                 
+                # Process articles and collect IDs for this topic
+                for article in articles:
+                    # Process article with AI if available
+                    if gemini_service.is_available():
+                        summary = gemini_service.summarize_article(article['title'], article['content'])
+                        if summary:
+                            article['summary'] = summary
+                        
+                        # Generate bullet point highlights
+                        bullet_highlights = gemini_service.generate_bullet_point_highlights(article['title'], article['content'])
+                        if bullet_highlights:
+                            article['bullet_point_highlights'] = bullet_highlights
+                        
+                        # Analyze political bias
+                        bias = gemini_service.analyze_political_bias(article['title'], article['content'])
+                        article['political_bias'] = bias
+                    
+                    # Save to Cosmos DB and collect article ID
+                    try:
+                        created_article = news_article_service.create_article(
+                            title=article['title'],
+                            content=article['content'],
+                            source=article['source'],
+                            url=article['url'],
+                            topic=topic,
+                            summary=article.get('summary'),
+                            bullet_point_highlights=article.get('bullet_point_highlights'),
+                            political_bias=article.get('political_bias'),
+                            published_at=article.get('published_at')
+                        )
+                        
+                        if created_article and created_article.id:
+                            article_ids.append(created_article.id)
+                            
+                    except Exception as e:
+                        print(f"Error saving article to Cosmos DB: {e}")
+                
+                # Create newsletter for this topic
                 newsletter = newsletter_service.create_newsletter(
                     user_id=current_user.id,
                     title=f"Newsletter {topic.title()} - {datetime.now().strftime('%d/%m/%Y')}",
-                    content=topic_content,
-                    topic=topic
+                    topic=topic,
+                    articles=article_ids
                 )
                 
                 if newsletter:
@@ -444,7 +513,7 @@ def generate_newsletter():
             
             return jsonify({
                 'message': 'Newsletters generated successfully',
-                'newsletters': [n.to_dict() for n in newsletters],
+                'newsletters': [{'id': n.id, 'data': n.to_dict()} for n in newsletters],
                 'format': 'by_topic'
             }), 201
         
@@ -489,15 +558,53 @@ def get_user_newsletters():
 @news_bp.route('/newsletters/<newsletter_id>/save', methods=['POST'])
 @login_required
 def save_newsletter(newsletter_id):
-    """Save/unsave a newsletter"""
+    """Save/unsave a newsletter - Deprecated: New model doesn't use save functionality"""
     try:
-        success = newsletter_service.save_newsletter(newsletter_id, current_user.id)
+        # This endpoint is deprecated with the new newsletter model
+        # Newsletters are now article reference collections, not saved content
+        return jsonify({
+            'message': 'Save functionality deprecated with new newsletter model',
+            'newsletter_id': newsletter_id,
+            'note': 'Newsletters are now article reference collections'
+        }), 200
         
-        if not success:
-            return jsonify({'error': 'Newsletter not found or operation failed'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@news_bp.route('/newsletters/<newsletter_id>', methods=['GET'])
+@login_required
+def get_newsletter_details(newsletter_id):
+    """Get newsletter details with populated articles"""
+    try:
+        newsletter_data = newsletter_service.get_newsletter_with_articles(newsletter_id, current_user.id)
+        
+        if not newsletter_data:
+            return jsonify({'error': 'Newsletter not found'}), 404
+        
+        newsletter = newsletter_data['newsletter']
+        articles = newsletter_data['articles']
         
         return jsonify({
-            'message': 'Newsletter save status toggled successfully',
+            'newsletter': newsletter.to_dict(),
+            'articles': [article.to_dict() for article in articles],
+            'article_count': len(articles)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@news_bp.route('/newsletters/<newsletter_id>', methods=['DELETE'])
+@login_required
+def delete_newsletter(newsletter_id):
+    """Delete a newsletter"""
+    try:
+        success = newsletter_service.delete_newsletter(newsletter_id, current_user.id)
+        
+        if not success:
+            return jsonify({'error': 'Newsletter not found or deletion failed'}), 404
+        
+        return jsonify({
+            'message': 'Newsletter deleted successfully',
             'newsletter_id': newsletter_id
         }), 200
         
@@ -507,13 +614,16 @@ def save_newsletter(newsletter_id):
 @news_bp.route('/newsletters/saved', methods=['GET'])
 @login_required
 def get_saved_newsletters():
-    """Get user's saved newsletters"""
+    """Get user's newsletters - 'Saved' concept deprecated with new model"""
     try:
-        newsletters = newsletter_service.get_saved_newsletters(current_user.id)
+        # With the new model, all newsletters are simply user's newsletters
+        # The concept of 'saved' vs 'unsaved' is no longer relevant
+        newsletters = newsletter_service.get_user_newsletters(current_user.id)
         
         return jsonify({
             'newsletters': [n.to_dict() for n in newsletters],
-            'count': len(newsletters)
+            'count': len(newsletters),
+            'note': 'All newsletters are now persistent article collections'
         }), 200
         
     except Exception as e:

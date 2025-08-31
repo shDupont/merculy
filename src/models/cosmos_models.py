@@ -7,38 +7,34 @@ from src.services.cosmos_service import CosmosService
 
 
 class CosmosNewsletter:
-    """Newsletter model for Cosmos DB"""
+    """Newsletter model for Cosmos DB - Article Reference Collection"""
     
     def __init__(self, newsletter_data=None):
         if newsletter_data:
             self.id = newsletter_data.get('id')
             self.user_id = newsletter_data.get('user_id')
             self.title = newsletter_data.get('title')
-            self.content = newsletter_data.get('content')
             self.topic = newsletter_data.get('topic')
             self.created_at = newsletter_data.get('created_at')
-            self.sent_at = newsletter_data.get('sent_at')
-            self.is_saved = newsletter_data.get('is_saved', False)
+            self.articles = newsletter_data.get('articles', [])  # List of article IDs
         else:
             self.id = None
             self.user_id = None
             self.title = None
-            self.content = None
             self.topic = None
             self.created_at = None
-            self.sent_at = None
-            self.is_saved = False
+            self.articles = []
     
     def to_dict(self):
         """Convert newsletter to dictionary for API responses"""
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'title': self.title,
-            'content': self.content,
             'topic': self.topic,
             'created_at': self.created_at,
-            'sent_at': self.sent_at,
-            'is_saved': self.is_saved
+            'articles': self.articles,
+            'article_count': len(self.articles) if self.articles else 0
         }
     
     def to_cosmos_dict(self):
@@ -47,11 +43,9 @@ class CosmosNewsletter:
             'id': self.id,
             'user_id': self.user_id,
             'title': self.title,
-            'content': self.content,
             'topic': self.topic,
             'created_at': self.created_at,
-            'sent_at': self.sent_at,
-            'is_saved': self.is_saved,
+            'articles': self.articles,
             'type': 'newsletter'
         }
 
@@ -65,6 +59,7 @@ class CosmosNewsArticle:
             self.title = article_data.get('title')
             self.content = article_data.get('content')
             self.summary = article_data.get('summary')
+            self.bullet_point_highlights = article_data.get('bullet_point_highlights')
             self.source = article_data.get('source')
             self.url = article_data.get('url')
             self.topic = article_data.get('topic')
@@ -76,6 +71,7 @@ class CosmosNewsArticle:
             self.title = None
             self.content = None
             self.summary = None
+            self.bullet_point_highlights = None
             self.source = None
             self.url = None
             self.topic = None
@@ -90,6 +86,7 @@ class CosmosNewsArticle:
             'title': self.title,
             'content': self.content,
             'summary': self.summary,
+            'bullet_point_highlights': self.bullet_point_highlights,
             'source': self.source,
             'url': self.url,
             'topic': self.topic,
@@ -105,6 +102,7 @@ class CosmosNewsArticle:
             'title': self.title,
             'content': self.content,
             'summary': self.summary,
+            'bullet_point_highlights': self.bullet_point_highlights,
             'source': self.source,
             'url': self.url,
             'topic': self.topic,
@@ -121,16 +119,15 @@ class NewsletterService:
     def __init__(self):
         self.cosmos_service = CosmosService()
     
-    def create_newsletter(self, user_id, title, content, topic=None):
-        """Create a new newsletter"""
+    def create_newsletter(self, user_id, title, topic, articles):
+        """Create a new newsletter with article references"""
         try:
             newsletter_data = {
                 'user_id': str(user_id),
                 'title': title,
-                'content': content,
                 'topic': topic,
-                'created_at': datetime.utcnow().isoformat(),
-                'is_saved': False
+                'articles': articles,  # List of article IDs
+                'created_at': datetime.utcnow().isoformat()
             }
             
             cosmos_newsletter = self.cosmos_service.create_newsletter(newsletter_data)
@@ -151,23 +148,41 @@ class NewsletterService:
             print(f"Error getting user newsletters: {e}")
             return []
     
-    def save_newsletter(self, newsletter_id, user_id):
-        """Save/unsave a newsletter"""
+    def get_newsletter_with_articles(self, newsletter_id, user_id):
+        """Get newsletter with populated article data"""
         try:
-            result = self.cosmos_service.save_newsletter(newsletter_id, str(user_id))
+            # Get the newsletter
+            newsletter = self.cosmos_service.get_newsletter_by_id(newsletter_id, str(user_id))
+            if not newsletter:
+                return None
+            
+            newsletter_obj = CosmosNewsletter(newsletter)
+            
+            # Get the articles data
+            articles_data = []
+            for article_id in newsletter_obj.articles:
+                article = self.cosmos_service.get_news_article_by_id(article_id)
+                if article:
+                    articles_data.append(CosmosNewsArticle(article))
+            
+            # Return newsletter with articles data
+            return {
+                'newsletter': newsletter_obj,
+                'articles': articles_data
+            }
+            
+        except Exception as e:
+            print(f"Error getting newsletter with articles: {e}")
+            return None
+    
+    def delete_newsletter(self, newsletter_id, user_id):
+        """Delete a newsletter"""
+        try:
+            result = self.cosmos_service.delete_newsletter(newsletter_id, str(user_id))
             return result is not None
         except Exception as e:
-            print(f"Error saving newsletter: {e}")
+            print(f"Error deleting newsletter: {e}")
             return False
-    
-    def get_saved_newsletters(self, user_id, limit=50):
-        """Get saved newsletters for a user"""
-        try:
-            all_newsletters = self.get_user_newsletters(user_id, limit)
-            return [newsletter for newsletter in all_newsletters if newsletter.is_saved]
-        except Exception as e:
-            print(f"Error getting saved newsletters: {e}")
-            return []
 
 
 class NewsArticleService:
@@ -177,13 +192,14 @@ class NewsArticleService:
         self.cosmos_service = CosmosService()
     
     def create_article(self, title, content, source, url, topic, 
-                      summary=None, political_bias=None, published_at=None):
+                      summary=None, bullet_point_highlights=None, political_bias=None, published_at=None):
         """Create a new news article"""
         try:
             article_data = {
                 'title': title,
                 'content': content,
                 'summary': summary,
+                'bullet_point_highlights': bullet_point_highlights,
                 'source': source,
                 'url': url,
                 'topic': topic,
