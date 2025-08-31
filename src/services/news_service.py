@@ -89,7 +89,7 @@ class NewsService:
         query = ' OR '.join(keywords)
         
         # Use user's followed channels if provided, otherwise use all Brazilian sources
-        print(user_channels)
+        print(f"[TOPIC] {user_channels}")
         if user_channels and len(user_channels) > 0:
             selected_sources = user_channels
         else:
@@ -99,6 +99,8 @@ class NewsService:
         news_per_source = max(1, limit // len(selected_sources))
         remainder = limit % len(selected_sources)
         
+        print(f"[TOPIC] News per source: {news_per_source}")
+
         all_articles = []
         
         for i, source_domain in enumerate(selected_sources):
@@ -111,8 +113,14 @@ class NewsService:
                 'pageSize': min(source_limit, 100),
                 'from': (datetime.now() - timedelta(days=7)).isoformat()  # Last 7 days
             }
+
+            print("[TOPIC] Params:")
+            print(params)
             
             result = self._make_news_api_request(params)
+
+            print("[TOPIC] Result:")
+            print(result)
             
             if result and 'articles' in result:
                 source_articles = []
@@ -211,19 +219,17 @@ class NewsService:
         
         # Get user's followed channels
         user_channels = None
-        if hasattr(user, 'get_followed_channels'):
-            user_channels = user.get_followed_channels()
-            print(f"[INTERESTS] User channels: {user_channels}")
-        else:
-            print("[INTERESTS] User has no get_followed_channels method")
-        
+        user_channels = user.get_followed_channels()
+
+        channel_domains = cosmos_service.get_domain_from_channels(user_channels)
+    
         print(f"[INTERESTS] Calling get_news_by_multiple_topics with: topics={user_interests}, limit={limit}, user_channels={user_channels}")
         
         # Use the multiple topics method for better distribution
         result = self.get_news_by_multiple_topics(
             topics=user_interests,
             limit=limit,
-            user_channels=user_channels
+            user_channels=channel_domains
         )
         
         print(f"[INTERESTS] get_news_by_multiple_topics returned: {type(result)}")

@@ -346,6 +346,22 @@ class CosmosService:
             print(f"Error getting channels from Cosmos DB: {e}")
             return []
 
+    def get_domain_from_channels(self, channels: list[str]):
+        """ Convert channel IDs to domains """
+        channel_domains = []
+        if channels:
+            # Get all available channels from Cosmos DB
+            all_channels = self.get_available_channels()
+            
+            for channel_id in channels:
+                # Find the corresponding domain for each channel ID
+                for channel in all_channels:
+                    if channel.get('id') == channel_id and channel.get('isActive', True):
+                        channel_domains.append(channel.get('domain'))
+                        break
+                    
+        return channel_domains if channel_domains else None
+        
 # Global instance
 cosmos_service = CosmosService()
 
