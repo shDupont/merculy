@@ -140,7 +140,7 @@ class NewsService:
 
     def get_news_by_multiple_topics(self, topics: List[str], limit: int = 20, user_channels: List[str] = None) -> Dict[str, List[Dict]]:
         """
-        Get news articles by multiple topics with intelligent distribution
+        Get news articles by multiple topics with equal distribution
         
         Args:
             topics: List of topics to search for
@@ -150,122 +150,89 @@ class NewsService:
         Returns:
             Dictionary with topic as key and list of articles as value
         """
+        print(f"[MULTIPLE_TOPICS] Starting with topics: {topics}, limit: {limit}, user_channels: {user_channels}")
+        
         if not topics:
+            print("[MULTIPLE_TOPICS] No topics provided - returning empty dict")
             return {}
         
-        # Calculate optimal news distribution per topic
-        # Minimum 1 article per topic, maximum 2 articles per topic initially
-        min_per_topic = 1
-        max_per_topic = 2
-        
-        # Use user's followed channels if provided
-        if user_channels and len(user_channels) > 0:
-            selected_sources = user_channels
-        else:
-            selected_sources = self.get_brazilian_sources_domains()
+        # Simple equal division: divide total limit by number of topics
+        articles_per_topic = limit // len(topics)
+        print(f"[MULTIPLE_TOPICS] Articles per topic: {articles_per_topic}")
         
         news_by_topic = {}
-        total_collected = 0
         
-        # First pass: Give minimum articles to each topic
-        for topic in topics:
-            if total_collected >= limit:
-                break
-                
-            # Get minimum articles for this topic
+        # Get articles for each topic with equal distribution
+        for i, topic in enumerate(topics):
+            # Calculate limit for this topic (distribute remainder to first topics)
+            topic_limit = articles_per_topic
+
+            print(f"[MULTIPLE_TOPICS] Processing topic '{topic}' with limit: {topic_limit}")
+            
+            # Get articles for this topic
             topic_articles = self.get_news_by_topic(
                 topic=topic,
-                limit=min_per_topic,
-                user_channels=selected_sources
+                limit=topic_limit,
+                user_channels=user_channels
             )
+            
+            print(f"[MULTIPLE_TOPICS] Topic '{topic}' returned {len(topic_articles) if topic_articles else 0} articles")
             
             if topic_articles:
                 news_by_topic[topic] = topic_articles
-                total_collected += len(topic_articles)
+            else:
+                print(f"[MULTIPLE_TOPICS] No articles found for topic '{topic}'")
         
-        # Second pass: Distribute remaining articles up to max_per_topic
-        remaining_limit = limit - total_collected
-        if remaining_limit > 0:
-            for topic in topics:
-                if remaining_limit <= 0:
-                    break
-                    
-                if topic in news_by_topic and len(news_by_topic[topic]) < max_per_topic:
-                    # Get one more article for this topic
-                    additional_articles = self.get_news_by_topic(
-                        topic=topic,
-                        limit=max_per_topic,
-                        user_channels=selected_sources
-                    )
-                    
-                    # Add articles we don't already have
-                    existing_urls = {article['url'] for article in news_by_topic[topic]}
-                    new_articles = [
-                        article for article in additional_articles 
-                        if article['url'] not in existing_urls
-                    ]
-                    
-                    # Add up to one more article
-                    if new_articles:
-                        news_by_topic[topic].append(new_articles[0])
-                        total_collected += 1
-                        remaining_limit -= 1
-        
-        # Third pass: If we still have remaining limit, add more articles beyond max_per_topic
-        remaining_limit = limit - total_collected
-        if remaining_limit > 0:
-            for topic in topics:
-                if remaining_limit <= 0:
-                    break
-                    
-                if topic in news_by_topic:
-                    # Calculate how many more we can add for this topic
-                    can_add = min(remaining_limit, 3)  # Allow up to 3 more articles per topic
-                    
-                    if can_add > 0:
-                        # Get more articles for this topic
-                        extended_articles = self.get_news_by_topic(
-                            topic=topic,
-                            limit=max_per_topic + can_add,
-                            user_channels=selected_sources
-                        )
-                        
-                        # Add articles we don't already have
-                        existing_urls = {article['url'] for article in news_by_topic[topic]}
-                        new_articles = [
-                            article for article in extended_articles 
-                            if article['url'] not in existing_urls
-                        ]
-                        
-                        # Add up to 'can_add' articles
-                        articles_to_add = new_articles[:can_add]
-                        news_by_topic[topic].extend(articles_to_add)
-                        added_count = len(articles_to_add)
-                        total_collected += added_count
-                        remaining_limit -= added_count
-        
+        print(f"[MULTIPLE_TOPICS] Final result: {len(news_by_topic)} topics with articles")
         return news_by_topic
     
-    def get_news_by_interests(self, interests: List[str], limit_per_topic: int = 10, user_channels: List[str] = None) -> Dict[str, List[Dict]]:
+    def get_news_by_interests(self, user, limit: int = 20) -> Dict[str, List[Dict]]:
         """
-        Get news articles based on user interests with channel filtering
+        Get news articles based on current user's interests using multiple topics approach
         
         Args:
-            interests: List of user interests/topics
-            limit_per_topic: Maximum articles per topic
-            user_channels: List of channel domains that user follows (optional)
+            user: Current user object with interests and followed_channels
+            limit: Total maximum number of articles to return across all interests
             
         Returns:
             Dictionary with topic as key and list of articles as value
         """
-        news_by_topic = {}
+        # Get user's interests
+        user_interests = user.get_interests()
+
+        print(f"[INTERESTS] User interests: {user_interests}")
+        print(f"[INTERESTS] User type: {type(user)}")
+        print(f"[INTERESTS] User ID: {getattr(user, 'id', 'unknown')}")
         
-        for interest in interests:
-            articles = self.get_news_by_topic(interest, limit_per_topic, user_channels)
-            if articles:
-                news_by_topic[interest] = articles
+        if not user_interests:
+            print("[INTERESTS] No user interests found - returning empty dict")
+            # Return empty if user has no interests
+            return {}
         
-        return news_by_topic
+        # Get user's followed channels
+        user_channels = None
+        if hasattr(user, 'get_followed_channels'):
+            user_channels = user.get_followed_channels()
+            print(f"[INTERESTS] User channels: {user_channels}")
+        else:
+            print("[INTERESTS] User has no get_followed_channels method")
+        
+        print(f"[INTERESTS] Calling get_news_by_multiple_topics with: topics={user_interests}, limit={limit}, user_channels={user_channels}")
+        
+        # Use the multiple topics method for better distribution
+        result = self.get_news_by_multiple_topics(
+            topics=user_interests,
+            limit=limit,
+            user_channels=user_channels
+        )
+        
+        print(f"[INTERESTS] get_news_by_multiple_topics returned: {type(result)}")
+        print(f"[INTERESTS] Result keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
+        if isinstance(result, dict):
+            for topic, articles in result.items():
+                print(f"[INTERESTS] Topic '{topic}': {len(articles)} articles")
+        
+        return result
     
     def get_trending_news(self, limit: int = 20) -> List[Dict]:
         """Get trending news from Brazil"""

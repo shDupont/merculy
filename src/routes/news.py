@@ -237,6 +237,68 @@ def get_news_by_multiple_topics():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@news_bp.route('/news/user-interests', methods=['GET'])
+@login_required
+def get_news_by_user_interests():
+    """Get news based on current user's interests with intelligent distribution"""
+    try:
+        # Get limit parameter (default 20)
+        limit = request.args.get('limit', 20, type=int)
+        
+        # Debug: Check user interests
+        user_interests = current_user.get_interests()
+        print(f"[DEBUG] User {current_user.id} interests: {user_interests}")
+        print(f"[DEBUG] Is List of Interests {'yes' if isinstance(user_interests, list) else 'no'}")
+        
+        # Debug: Check user channels
+        user_channels = None
+        if hasattr(current_user, 'get_followed_channels'):
+            user_channels = current_user.get_followed_channels()
+            print(f"[DEBUG] User {current_user.id} channels: {user_channels}")
+        
+        # Get news for current user's interests automatically
+        result = news_service.get_news_by_interests(current_user, limit=limit)
+        
+        print(f"[DEBUG] Result: {result}")
+        print(f"[DEBUG] Result type: {type(result)}")
+        print(f"[DEBUG] Result keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
+        
+        if isinstance(result, dict) and 'error' in result:
+            return jsonify({
+                'error': result['error'],
+                'details': result.get('details', ''),
+                'debug_info': {
+                    'user_interests': user_interests,
+                    'user_channels': user_channels,
+                    'limit': limit
+                }
+            }), 400
+            
+        return jsonify({
+            'success': True,
+            'data': result,
+            'user_id': current_user.id,
+            'timestamp': datetime.now().isoformat(),
+            'debug_info': {
+                'user_interests': user_interests,
+                'user_channels': user_channels,
+                'limit': limit,
+                'data_keys': list(result.keys()) if isinstance(result, dict) else [],
+                'total_articles': sum(len(articles) for articles in result.values()) if isinstance(result, dict) else 0
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERROR] Exception in get_news_by_user_interests: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'debug_info': {
+                'user_id': getattr(current_user, 'id', 'unknown'),
+                'user_interests': getattr(current_user, 'interests', 'unknown'),
+                'limit': limit
+            }
+        }), 500
+
 @news_bp.route('/trending', methods=['GET'])
 @login_required
 def get_trending_news():
@@ -304,8 +366,8 @@ def generate_newsletter():
             
             user_channels = channel_domains if channel_domains else None
         
-        # Get news for user interests
-        news_by_topic = news_service.get_news_by_interests(user_interests, limit_per_topic=5, user_channels=user_channels)
+        # Get news for user interests using the updated method
+        news_by_topic = news_service.get_news_by_interests(current_user, limit=25)
         
         if not news_by_topic:
             return jsonify({'error': 'No news articles found for user interests'}), 404
