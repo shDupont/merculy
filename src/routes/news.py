@@ -13,21 +13,98 @@ news_bp = Blueprint('news', __name__)
 
 @news_bp.route('/topics', methods=['GET'])
 def get_available_topics():
-    """Get list of available news topics"""
-    return jsonify({
-        'topics': Config.AVAILABLE_TOPICS,
-        'sources': news_service.get_available_sources()
-    }), 200
+    """Get list of available news topics from Cosmos DB"""
+    try:
+        # Get topics from Cosmos DB
+        cosmos_topics = cosmos_service.get_available_topics()
+        
+        if cosmos_topics:
+            topics = [topic['id'] for topic in cosmos_topics if topic.get('isActive', True)]
+        else:
+            # Fallback to config topics if Cosmos DB is not available
+            topics = Config.AVAILABLE_TOPICS
+        
+        # Get sources from Cosmos DB through news_service
+        sources = news_service.get_available_sources()
+        
+        return jsonify({
+            'topics': topics,
+            'sources': sources
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@news_bp.route('/sources', methods=['GET'])
+def get_available_sources():
+    """Get list of available news sources from Cosmos DB"""
+    try:
+        sources = news_service.get_available_sources()
+        return jsonify({
+            'sources': sources,
+            'count': len(sources)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@news_bp.route('/topics/detailed', methods=['GET'])
+def get_detailed_topics():
+    """Get detailed information about available topics from Cosmos DB"""
+    try:
+        cosmos_topics = cosmos_service.get_available_topics()
+        
+        if cosmos_topics:
+            topics = [
+                {
+                    'id': topic['id'],
+                    'name': topic['name'],
+                    'isActive': topic.get('isActive', True)
+                }
+                for topic in cosmos_topics if topic.get('isActive', True)
+            ]
+        else:
+            # Fallback to config topics if Cosmos DB is not available
+            topics = [
+                {'id': topic, 'name': topic.title(), 'isActive': True}
+                for topic in Config.AVAILABLE_TOPICS
+            ]
+        
+        return jsonify({
+            'topics': topics,
+            'count': len(topics)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/news/<topic>', methods=['GET'])
 @login_required
 def get_news_by_topic(topic):
-    """Get news articles by topic"""
+    """Get news articles by topic with user's channel preferences"""
     try:
         limit = request.args.get('limit', 20, type=int)
         limit = min(limit, 100)  # Max 100 articles
         
-        articles = news_service.get_news_by_topic(topic, limit)
+        # Get user's followed channels
+        user_channels = current_user.get_followed_channels()
+        
+        # Convert channel IDs to domains if necessary
+        if user_channels:
+            # Get all available channels from Cosmos DB
+            all_channels = cosmos_service.get_available_channels()
+            channel_domains = []
+            
+            for channel_id in user_channels:
+                # Find the corresponding domain for each channel ID
+                for channel in all_channels:
+                    if channel.get('id') == channel_id and channel.get('isActive', True):
+                        channel_domains.append(channel.get('domain'))
+                        break
+            
+            user_channels = channel_domains if channel_domains else None
+        
+        articles = news_service.get_news_by_topic(topic, limit, user_channels)
         
         # Process articles with AI if available
         processed_articles = []
@@ -62,7 +139,99 @@ def get_news_by_topic(topic):
         return jsonify({
             'topic': topic,
             'articles': processed_articles,
-            'count': len(processed_articles)
+            'count': len(processed_articles),
+            'sources_used': len(user_channels) if user_channels else 'all_brazilian_sources'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@news_bp.route('/news/multiple-topics', methods=['POST'])
+@login_required
+def get_news_by_multiple_topics():
+    """Get news articles by multiple topics with intelligent distribution"""
+    try:
+        data = request.get_json()
+        if not data or 'topics' not in data:
+            return jsonify({'error': 'Topics list is required in request body'}), 400
+        
+        topics = data.get('topics', [])
+        limit = data.get('limit', 20)
+        limit = min(limit, 40)  # Max 100 articles
+        
+        if not topics or not isinstance(topics, list):
+            return jsonify({'error': 'Topics must be a non-empty list'}), 400
+        
+        # Get user's followed channels
+        user_channels = current_user.get_followed_channels()
+        
+        # Convert channel IDs to domains if necessary
+        if user_channels:
+            # Get all available channels from Cosmos DB
+            all_channels = cosmos_service.get_available_channels()
+            channel_domains = []
+            
+            for channel_id in user_channels:
+                # Find the corresponding domain for each channel ID
+                for channel in all_channels:
+                    if channel.get('id') == channel_id and channel.get('isActive', True):
+                        channel_domains.append(channel.get('domain'))
+                        break
+            
+            user_channels = channel_domains if channel_domains else None
+        
+        # Get news by multiple topics
+        news_by_topic = news_service.get_news_by_multiple_topics(topics, limit, user_channels)
+        
+        # Process articles with AI if available
+        processed_news_by_topic = {}
+        total_articles = 0
+        
+        for topic, articles in news_by_topic.items():
+            processed_articles = []
+            
+            for article in articles:
+                # Generate summary with Gemini
+                if gemini_service.is_available():
+                    summary = gemini_service.summarize_article(article['title'], article['content'])
+                    if summary:
+                        article['summary'] = summary
+                    
+                    # Analyze political bias
+                    bias = gemini_service.analyze_political_bias(article['title'], article['content'])
+                    article['political_bias'] = bias
+                
+                processed_articles.append(article)
+                
+                # Save to Cosmos DB
+                try:
+                    news_article_service.create_article(
+                        title=article['title'],
+                        content=article['content'],
+                        source=article['source'],
+                        url=article['url'],
+                        topic=topic,
+                        summary=article.get('summary'),
+                        political_bias=article.get('political_bias'),
+                        published_at=article['published_at']
+                    )
+                except Exception as e:
+                    print(f"Error saving article to Cosmos DB: {e}")
+            
+            processed_news_by_topic[topic] = processed_articles
+            total_articles += len(processed_articles)
+        
+        return jsonify({
+            'topics': list(processed_news_by_topic.keys()),
+            'news_by_topic': processed_news_by_topic,
+            'total_articles': total_articles,
+            'sources_used': len(user_channels) if user_channels else 'all_brazilian_sources',
+            'distribution_info': {
+                'requested_topics': len(topics),
+                'topics_with_news': len(processed_news_by_topic),
+                'requested_limit': limit,
+                'actual_total': total_articles
+            }
         }), 200
         
     except Exception as e:
@@ -117,8 +286,26 @@ def generate_newsletter():
         if not user_interests:
             user_interests = ['tecnologia', 'política', 'economia']  # Default interests
         
+        # Get user's followed channels
+        user_channels = current_user.get_followed_channels()
+        
+        # Convert channel IDs to domains if necessary
+        if user_channels:
+            # Get all available channels from Cosmos DB
+            all_channels = cosmos_service.get_available_channels()
+            channel_domains = []
+            
+            for channel_id in user_channels:
+                # Find the corresponding domain for each channel ID
+                for channel in all_channels:
+                    if channel.get('id') == channel_id and channel.get('isActive', True):
+                        channel_domains.append(channel.get('domain'))
+                        break
+            
+            user_channels = channel_domains if channel_domains else None
+        
         # Get news for user interests
-        news_by_topic = news_service.get_news_by_interests(user_interests, limit_per_topic=5)
+        news_by_topic = news_service.get_news_by_interests(user_interests, limit_per_topic=5, user_channels=user_channels)
         
         if not news_by_topic:
             return jsonify({'error': 'No news articles found for user interests'}), 404
@@ -282,11 +469,24 @@ def get_topic_suggestions():
         if gemini_service.is_available():
             suggestions = gemini_service.generate_topic_suggestions(history)
         else:
-            suggestions = Config.AVAILABLE_TOPICS[:5]
+            # Get available topics from Cosmos DB
+            cosmos_topics = cosmos_service.get_available_topics()
+            if cosmos_topics:
+                active_topics = [topic['id'] for topic in cosmos_topics if topic.get('isActive', True)]
+                suggestions = active_topics[:5]
+            else:
+                suggestions = Config.AVAILABLE_TOPICS[:5]
+        
+        # Get all available topics from Cosmos DB
+        cosmos_topics = cosmos_service.get_available_topics()
+        if cosmos_topics:
+            all_topics = [topic['id'] for topic in cosmos_topics if topic.get('isActive', True)]
+        else:
+            all_topics = Config.AVAILABLE_TOPICS
         
         return jsonify({
             'suggested_topics': suggestions,
-            'all_topics': Config.AVAILABLE_TOPICS
+            'all_topics': all_topics
         }), 200
         
     except Exception as e:

@@ -52,6 +52,10 @@ class CosmosService:
             {
                 'id': 'user_preferences',
                 'partition_key': PartitionKey(path="/user_id"),
+            },
+            {
+                'id': 'newsConf',
+                'partition_key': PartitionKey(path="/id"),
             }
         ]
         
@@ -298,6 +302,49 @@ class CosmosService:
         except Exception as e:
             print(f"Error getting user preferences from Cosmos DB: {e}")
             return None
+
+    # News configuration operations
+    def get_available_topics(self):
+        """Get available topics from Cosmos DB newsConf container"""
+        if not self.is_available():
+            return []
+        
+        try:
+            container = self.database.get_container_client('newsConf')
+            item = container.read_item(
+                item='available-topics',
+                partition_key='available-topics'
+            )
+            
+            if item and 'items' in item:
+                # Return only active topics
+                active_topics = [topic for topic in item['items'] if topic.get('isActive', True)]
+                return active_topics
+            return []
+        except Exception as e:
+            print(f"Error getting topics from Cosmos DB: {e}")
+            return []
+    
+    def get_available_channels(self):
+        """Get available channels from Cosmos DB newsConf container"""
+        if not self.is_available():
+            return []
+        
+        try:
+            container = self.database.get_container_client('newsConf')
+            item = container.read_item(
+                item='available-channels',
+                partition_key='available-channels'
+            )
+            
+            if item and 'items' in item:
+                # Return only active channels
+                active_channels = [channel for channel in item['items'] if channel.get('isActive', True)]
+                return active_channels
+            return []
+        except Exception as e:
+            print(f"Error getting channels from Cosmos DB: {e}")
+            return []
 
 # Global instance
 cosmos_service = CosmosService()

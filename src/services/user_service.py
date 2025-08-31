@@ -30,6 +30,7 @@ class CosmosUser(UserMixin):
                 'days': ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
                 'time': '08:00'
             })
+            self.followed_channels = user_data.get('followed_channels', [])
             self.created_at = user_data.get('created_at')
             self.last_login = user_data.get('last_login')
         else:
@@ -46,6 +47,7 @@ class CosmosUser(UserMixin):
                 'days': ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
                 'time': '08:00'
             }
+            self.followed_channels = []
             self.created_at = None
             self.last_login = None
 
@@ -72,6 +74,14 @@ class CosmosUser(UserMixin):
         if isinstance(schedule_dict, dict):
             self.delivery_schedule = schedule_dict
     
+    def get_followed_channels(self):
+        """Get user followed channels as a list"""
+        return self.followed_channels if isinstance(self.followed_channels, list) else []
+    
+    def set_followed_channels(self, channels_list):
+        """Set user followed channels from a list"""
+        self.followed_channels = channels_list if isinstance(channels_list, list) else []
+    
     def to_dict(self):
         """Convert user to dictionary for API responses"""
         return {
@@ -81,6 +91,7 @@ class CosmosUser(UserMixin):
             'interests': self.get_interests(),
             'newsletter_format': self.newsletter_format,
             'delivery_schedule': self.get_delivery_schedule(),
+            'followed_channels': self.get_followed_channels(),
             'created_at': self.created_at,
             'password_hash': self.password_hash
         }
@@ -97,6 +108,7 @@ class CosmosUser(UserMixin):
             'interests': self.get_interests(),
             'newsletter_format': self.newsletter_format,
             'delivery_schedule': self.get_delivery_schedule(),
+            'followed_channels': self.get_followed_channels(),
             'created_at': self.created_at,
             'last_login': self.last_login,
             'type': 'user'

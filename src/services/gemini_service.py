@@ -6,7 +6,7 @@ from src.config import Config
 class GeminiService:
     def __init__(self):
         self.api_key = Config.GEMINI_API_KEY
-        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent"
     
     def is_available(self):
         """Check if Gemini API is available"""
