@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, session, redirect, url_for
+from flask_cors import cross_origin
 from werkzeug.security import generate_password_hash, check_password_hash
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -55,6 +56,7 @@ def register():
         print(f"❌ [AUTH DEBUG] Registration error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@cross_origin()
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """Login with email and password"""
