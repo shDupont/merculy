@@ -27,10 +27,13 @@ def create_app():
         app, 
         supports_credentials=True, 
         origins=[
-            'http://localhost:*'
+            'http://localhost:*',
+            'https://merculy-app-hehte6a4ffc5hqeh.brazilsouth-01.azurewebsites.net'
         ],
         allow_headers=["Authorization", "Content-Type"],
-        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        supports_credentials=True,
+        expose_headers=["Authorization"]
     )
     
     # JWT Authentication debugging middleware
