@@ -24,7 +24,7 @@ def create_app():
     app.config.from_object(Config)
     
     # Enable CORS for all routes
-    CORS(app, supports_credentials=True)
+    CORS(app, supports_credentials=True,  allow_headers=["Authorization", "Content-Type"])
     
     # Initialize Flask-Login
     login_manager = LoginManager()
@@ -68,7 +68,25 @@ def create_app():
             'message': 'Merculy Backend API is running',
             'version': '1.0.0'
         }
+    
+    @app.route('/debug/session-info')
+    def session_info():
+        """Debug endpoint to check session and cookie info"""
+        return jsonify({
+            'session_data': dict(session),
+            'user_authenticated': current_user.is_authenticated,
+            'user_id': getattr(current_user, 'id', None) if current_user.is_authenticated else None,
+            'cookies': dict(request.cookies),
+            'headers': dict(request.headers),
+            'environment': {
+                'flask_env': app.config.get('FLASK_ENV'),
+                'azure_deployment': app.config.get('AZURE_DEPLOYMENT'),
+                'session_cookie_secure': app.config.get('SESSION_COOKIE_SECURE'),
+                'session_cookie_samesite': app.config.get('SESSION_COOKIE_SAMESITE'),
+            }
+    })
 
+    
     # API info endpoint
     @app.route('/api')
     def api_info():
