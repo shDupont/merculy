@@ -3,8 +3,7 @@ import sys
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, jsonify, request, send_from_directory, session
-from flask_login import LoginManager, current_user
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -23,26 +22,18 @@ def create_app():
     # Configuration
     app.config.from_object(Config)
     
-    # Enable CORS for all routes
-    CORS(app, supports_credentials=True,  allow_headers=["Authorization", "Content-Type"])
+    # Enable CORS for all routes with JWT token support
+    CORS(app, supports_credentials=True, allow_headers=["Authorization", "Content-Type"])
     
-    # Initialize Flask-Login
-    login_manager = LoginManager()
-    login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
-    login_manager.login_message = 'Please log in to access this page.'
-    login_manager.login_message_category = 'info'
-    
-    @login_manager.user_loader
-    def load_user(user_email):
-        """Load user from Cosmos DB for Flask-Login"""
-        print(f"[DEBUG] user_email: {user_email}")
-        return user_service.get_user_by_email(user_email)
-    
-    # Configure for API usage (no redirects)
-    @login_manager.unauthorized_handler
-    def unauthorized():
-        return jsonify({'error': 'Authentication required'}), 401
+    # JWT Authentication debugging middleware
+    @app.before_request
+    def log_jwt_info():
+        """Log JWT authentication information for debugging"""
+        if request.endpoint and 'static' not in request.endpoint:
+            auth_header = request.headers.get('Authorization', 'None')
+            print(f"🔍 [JWT DEBUG] {request.method} {request.path}")
+            print(f"    Auth Header: {auth_header[:50]}..." if len(auth_header) > 50 else f"    Auth Header: {auth_header}")
+            print(f"    Endpoint: {request.endpoint}")
     
     # Register blueprints
     app.register_blueprint(user_bp, url_prefix='/api')
@@ -69,22 +60,26 @@ def create_app():
             'version': '1.0.0'
         }
     
-    @app.route('/debug/session-info')
-    def session_info():
-        """Debug endpoint to check session and cookie info"""
+    @app.route('/debug/jwt-info')
+    def jwt_info():
+        """Debug endpoint to check JWT authentication info"""
+        from src.services.jwt_service import get_current_user_from_token
+        
+        auth_header = request.headers.get('Authorization', 'None')
+        current_user = get_current_user_from_token()
+        
         return jsonify({
-            'session_data': dict(session),
-            'user_authenticated': current_user.is_authenticated,
-            'user_id': getattr(current_user, 'id', None) if current_user.is_authenticated else None,
-            'cookies': dict(request.cookies),
+            'auth_header': auth_header[:50] + '...' if len(auth_header) > 50 else auth_header,
+            'user_authenticated': current_user is not None,
+            'user_id': getattr(current_user, 'id', None) if current_user else None,
+            'user_email': getattr(current_user, 'email', None) if current_user else None,
             'headers': dict(request.headers),
             'environment': {
-                'flask_env': app.config.get('FLASK_ENV'),
-                'azure_deployment': app.config.get('AZURE_DEPLOYMENT'),
-                'session_cookie_secure': app.config.get('SESSION_COOKIE_SECURE'),
-                'session_cookie_samesite': app.config.get('SESSION_COOKIE_SAMESITE'),
+                'jwt_secret_configured': bool(app.config.get('JWT_SECRET_KEY')),
+                'jwt_expires_in': app.config.get('JWT_ACCESS_TOKEN_EXPIRES'),
+                'jwt_algorithm': app.config.get('JWT_ALGORITHM'),
             }
-    })
+        })
 
     
     # API info endpoint

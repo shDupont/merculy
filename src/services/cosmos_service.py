@@ -104,6 +104,24 @@ class CosmosService:
             print(f"Error getting user from Cosmos DB: {e}")
             return None
     
+    def get_user_by_id(self, user_id):
+        """Get user by ID from Cosmos DB"""
+        if not self.is_available():
+            return None
+        
+        try:
+            container = self.database.get_container_client('users')
+            query = "SELECT * FROM c WHERE c.id = @user_id"
+            items = list(container.query_items(
+                query=query,
+                parameters=[{"name": "@user_id", "value": str(user_id)}],
+                enable_cross_partition_query=True
+            ))
+            return items[0] if items else None
+        except Exception as e:
+            print(f"Error getting user by ID from Cosmos DB: {e}")
+            return None
+    
     def get_user_by_oauth_id(self, oauth_id, provider):
         """Get user by OAuth ID from Cosmos DB"""
         if not self.is_available():

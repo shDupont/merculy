@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify, session, redirect, url_for
-from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -8,6 +7,7 @@ import json
 from datetime import datetime
 
 from src.services.user_service import user_service
+from src.services.jwt_service import jwt_service, jwt_required
 from src.config import Config
 
 auth_bp = Blueprint('auth', __name__)
@@ -39,14 +39,20 @@ def register():
         if not user:
             return jsonify({'error': 'Failed to create user'}), 500
         
-        login_user(user, force=True)
+        # Generate JWT token
+        token = jwt_service.generate_token(user.id, user.email)
+        if not token:
+            return jsonify({'error': 'Failed to generate authentication token'}), 500
         
         return jsonify({
             'message': 'User registered successfully',
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'token': token,
+            'token_type': 'Bearer'
         }), 201
         
     except Exception as e:
+        print(f"❌ [AUTH DEBUG] Registration error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/login', methods=['POST'])
@@ -61,20 +67,28 @@ def login():
         user = user_service.authenticate_user(data['email'], data['password'])
         
         if not user:
+            print(f"❌ [AUTH DEBUG] Login failed for email: {data['email']}")
             return jsonify({'error': 'Invalid credentials'}), 401
         
         # Update last login
         user_service.update_last_login(user.email)
         
-        is_logged = login_user(user, force=True)
+        # Generate JWT token
+        token = jwt_service.generate_token(user.id, user.email)
+        if not token:
+            return jsonify({'error': 'Failed to generate authentication token'}), 500
+        
+        print(f"✅ [AUTH DEBUG] Login successful for user: {user.email}")
         
         return jsonify({
             'message': 'Login successful',
             'user': user.to_dict(),
-            'isLogged': is_logged
+            'token': token,
+            'token_type': 'Bearer'
         }), 200
         
     except Exception as e:
+        print(f"❌ [AUTH DEBUG] Login error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/google-login', methods=['POST'])
@@ -144,14 +158,22 @@ def google_login():
         # Update last login
         user_service.update_last_login(user.email)
         
-        login_user(user, force=True)
+        # Generate JWT token
+        token = jwt_service.generate_token(user.id, user.email)
+        if not token:
+            return jsonify({'error': 'Failed to generate authentication token'}), 500
+        
+        print(f"✅ [AUTH DEBUG] Google login successful for user: {user.email}")
         
         return jsonify({
             'message': 'Google login successful',
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'token': token,
+            'token_type': 'Bearer'
         }), 200
         
     except Exception as e:
+        print(f"❌ [AUTH DEBUG] Google login error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/facebook-login', methods=['POST'])
@@ -204,32 +226,43 @@ def facebook_login():
         # Update last login
         user_service.update_last_login(user.email)
         
-        login_user(user, force=True)
+        # Generate JWT token
+        token = jwt_service.generate_token(user.id, user.email)
+        if not token:
+            return jsonify({'error': 'Failed to generate authentication token'}), 500
+        
+        print(f"✅ [AUTH DEBUG] Facebook login successful for user: {user.email}")
         
         return jsonify({
             'message': 'Facebook login successful',
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'token': token,
+            'token_type': 'Bearer'
         }), 200
         
     except Exception as e:
+        print(f"❌ [AUTH DEBUG] Facebook login error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/logout', methods=['POST'])
-@login_required
 def logout():
-    """Logout current user"""
-    logout_user()
-    return jsonify({'message': 'Logout successful'}), 200
+    """Logout current user - JWT tokens are stateless, so just return success"""
+    print("🔓 [AUTH DEBUG] Logout request received (JWT tokens are stateless)")
+    return jsonify({
+        'message': 'Logout successful',
+        'note': 'JWT tokens are stateless - remove token from client storage'
+    }), 200
 
 @auth_bp.route('/me', methods=['GET'])
-@login_required
-def get_current_user():
+@jwt_required
+def get_current_user(current_user):
     """Get current user information"""
+    print(f"✅ [AUTH DEBUG] User info requested for: {current_user.email}")
     return jsonify({'user': current_user.to_dict()}), 200
 
 @auth_bp.route('/update-profile', methods=['PUT'])
-@login_required
-def update_profile():
+@jwt_required
+def update_profile(current_user):
     """Update user profile"""
     try:
         data = request.get_json()
@@ -253,17 +286,20 @@ def update_profile():
         if not updated_user:
             return jsonify({'error': 'Failed to update profile'}), 500
         
+        print(f"✅ [AUTH DEBUG] Profile updated for user: {current_user.email}")
+        
         return jsonify({
             'message': 'Profile updated successfully',
             'user': updated_user.to_dict()
         }), 200
         
     except Exception as e:
+        print(f"❌ [AUTH DEBUG] Profile update error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/change-password', methods=['PUT'])
-@login_required
-def change_password():
+@jwt_required
+def change_password(current_user):
     """Change user password"""
     try:
         data = request.get_json()
@@ -282,8 +318,12 @@ def change_password():
         if not success:
             return jsonify({'error': 'Failed to change password'}), 500
         
+        print(f"✅ [AUTH DEBUG] Password changed for user: {current_user.email}")
+        
         return jsonify({'message': 'Password changed successfully'}), 200
         
     except Exception as e:
+        print(f"❌ [AUTH DEBUG] Password change error: {e}")
+        return jsonify({'error': str(e)}), 500
         return jsonify({'error': str(e)}), 500
 

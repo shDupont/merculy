@@ -6,6 +6,11 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
+    # JWT Configuration
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or SECRET_KEY
+    JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES', 86400))  # 24 hours in seconds
+    JWT_ALGORITHM = 'HS256'
+    
     # OAuth Configuration
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')

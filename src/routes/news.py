@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify
-from flask_login import login_required, current_user
 from datetime import datetime
 import json
 
@@ -7,6 +6,7 @@ from src.models.cosmos_models import newsletter_service, news_article_service
 from src.services.news_service import news_service
 from src.services.gemini_service import gemini_service
 from src.services.cosmos_service import cosmos_service
+from src.services.jwt_service import jwt_required
 from src.config import Config
 
 news_bp = Blueprint('news', __name__)
@@ -79,12 +79,14 @@ def get_detailed_topics():
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/news/<topic>', methods=['GET'])
-@login_required
-def get_news_by_topic(topic):
+@jwt_required
+def get_news_by_topic(current_user, topic):
     """Get news articles by topic with user's channel preferences"""
     try:
         limit = request.args.get('limit', 20, type=int)
         limit = min(limit, 100)  # Max 100 articles
+        
+        print(f"🔍 [NEWS DEBUG] Getting news for topic '{topic}' for user {current_user.email}")
         
         # Get user's followed channels
         user_channels = current_user.get_followed_channels()
@@ -158,8 +160,8 @@ def get_news_by_topic(topic):
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/news/multiple-topics', methods=['POST'])
-@login_required
-def get_news_by_multiple_topics():
+@jwt_required
+def get_news_by_multiple_topics(current_user):
     """Get news articles by multiple topics with intelligent distribution"""
     try:
         data = request.get_json()
@@ -172,6 +174,8 @@ def get_news_by_multiple_topics():
         
         if not topics or not isinstance(topics, list):
             return jsonify({'error': 'Topics must be a non-empty list'}), 400
+        
+        print(f"🔍 [NEWS DEBUG] Getting news for multiple topics {topics} for user {current_user.email}")
         
         # Get user's followed channels
         user_channels = current_user.get_followed_channels()
@@ -260,8 +264,8 @@ def get_news_by_multiple_topics():
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/news/user-interests', methods=['GET'])
-@login_required
-def get_news_by_user_interests():
+@jwt_required
+def get_news_by_user_interests(current_user):
     """Get news based on current user's interests with intelligent distribution"""
     try:
         # Get limit parameter (default 20)
@@ -322,8 +326,8 @@ def get_news_by_user_interests():
         }), 500
 
 @news_bp.route('/trending', methods=['GET'])
-@login_required
-def get_trending_news():
+@jwt_required
+def get_trending_news(current_user):
     """Get trending news"""
     try:
         limit = request.args.get('limit', 20, type=int)
@@ -338,8 +342,8 @@ def get_trending_news():
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/search', methods=['GET'])
-@login_required
-def search_news():
+@jwt_required
+def search_news(current_user):
     """Search for news articles"""
     try:
         query = request.args.get('q', '')
@@ -359,8 +363,8 @@ def search_news():
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/newsletter/generate', methods=['POST'])
-@login_required
-def generate_newsletter():
+@jwt_required
+def generate_newsletter(current_user):
     """Generate personalized newsletter for current user based on article references"""
     try:
         data = request.get_json() or {}
@@ -521,8 +525,8 @@ def generate_newsletter():
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/newsletters', methods=['GET'])
-@login_required
-def get_user_newsletters():
+@jwt_required
+def get_user_newsletters(current_user):
     """Get user's newsletters"""
     try:
         page = request.args.get('page', 1, type=int)
@@ -556,7 +560,7 @@ def get_user_newsletters():
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/newsletters/<newsletter_id>/save', methods=['POST'])
-@login_required
+@jwt_required
 def save_newsletter(newsletter_id):
     """Save/unsave a newsletter - Deprecated: New model doesn't use save functionality"""
     try:
@@ -572,8 +576,8 @@ def save_newsletter(newsletter_id):
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/newsletters/<newsletter_id>', methods=['GET'])
-@login_required
-def get_newsletter_details(newsletter_id):
+@jwt_required
+def get_newsletter_details(current_user, newsletter_id):
     """Get newsletter details with populated articles"""
     try:
         newsletter_data = newsletter_service.get_newsletter_with_articles(newsletter_id, current_user.id)
@@ -594,8 +598,8 @@ def get_newsletter_details(newsletter_id):
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/newsletters/<newsletter_id>', methods=['DELETE'])
-@login_required
-def delete_newsletter(newsletter_id):
+@jwt_required
+def delete_newsletter(current_user, newsletter_id):
     """Delete a newsletter"""
     try:
         success = newsletter_service.delete_newsletter(newsletter_id, current_user.id)
@@ -612,8 +616,8 @@ def delete_newsletter(newsletter_id):
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/newsletters/saved', methods=['GET'])
-@login_required
-def get_saved_newsletters():
+@jwt_required
+def get_saved_newsletters(current_user):
     """Get user's newsletters - 'Saved' concept deprecated with new model"""
     try:
         # With the new model, all newsletters are simply user's newsletters
@@ -630,8 +634,8 @@ def get_saved_newsletters():
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/preferences/topics', methods=['GET'])
-@login_required
-def get_topic_suggestions():
+@jwt_required
+def get_topic_suggestions(current_user):
     """Get topic suggestions based on user history"""
     try:
         # Get user's reading history
@@ -665,7 +669,7 @@ def get_topic_suggestions():
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/articles/<article_id>/analyze', methods=['POST'])
-@login_required
+@jwt_required
 def analyze_article(article_id):
     """Analyze article for fake news detection"""
     try:

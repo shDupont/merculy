@@ -1,23 +1,25 @@
 from flask import Blueprint, jsonify, request
-from flask_login import login_required, current_user
 from src.services.user_service import user_service
+from src.services.jwt_service import jwt_required
 
 user_bp = Blueprint('user', __name__)
 
 @user_bp.route('/users', methods=['GET'])
-@login_required
-def get_users():
+@jwt_required
+def get_users(current_user):
     """Get all users (admin functionality)"""
     try:
         limit = request.args.get('limit', 100, type=int)
         users = user_service.get_all_users(limit)
+        print(f"✅ [USER DEBUG] Admin user {current_user.email} requested users list")
         return jsonify([user.to_dict() for user in users]), 200
     except Exception as e:
+        print(f"❌ [USER DEBUG] Error getting users: {e}")
         return jsonify({'error': str(e)}), 500
 
 @user_bp.route('/users', methods=['POST'])
-@login_required
-def create_user():
+@jwt_required
+def create_user(current_user):
     """Create a new user (admin functionality)"""
     try:
         data = request.json
@@ -37,26 +39,32 @@ def create_user():
         if not user:
             return jsonify({'error': 'Failed to create user or user already exists'}), 409
         
+        print(f"✅ [USER DEBUG] Admin user {current_user.email} created new user: {user.email}")
         return jsonify(user.to_dict()), 201
         
     except Exception as e:
+        print(f"❌ [USER DEBUG] Error creating user: {e}")
         return jsonify({'error': str(e)}), 500
 
 @user_bp.route('/users/<user_id>', methods=['GET'])
-@login_required
-def get_user(user_id):
+@jwt_required
+def get_user(current_user, user_id):
     """Get user by ID"""
     try:
         user = user_service.get_user_by_id(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
+        
+        print(f"✅ [USER DEBUG] User {current_user.email} requested user info for: {user_id}")
         return jsonify(user.to_dict()), 200
+        
     except Exception as e:
+        print(f"❌ [USER DEBUG] Error getting user: {e}")
         return jsonify({'error': str(e)}), 500
 
 @user_bp.route('/users/<user_id>', methods=['PUT'])
-@login_required
-def update_user(user_id):
+@jwt_required
+def update_user(current_user, user_id):
     """Update user by ID"""
     try:
         data = request.json
@@ -90,8 +98,8 @@ def update_user(user_id):
         return jsonify({'error': str(e)}), 500
 
 @user_bp.route('/users/<user_id>', methods=['DELETE'])
-@login_required
-def delete_user(user_id):
+@jwt_required
+def delete_user(current_user, user_id):
     """Delete user by ID"""
     try:
         # Only allow users to delete their own profile, or admin functionality
@@ -104,7 +112,9 @@ def delete_user(user_id):
         if not success:
             return jsonify({'error': 'User not found or deletion failed'}), 404
         
+        print(f"✅ [USER DEBUG] User {current_user.email} deleted their profile")
         return '', 204
         
     except Exception as e:
+        print(f"❌ [USER DEBUG] Error deleting user: {e}")
         return jsonify({'error': str(e)}), 500
