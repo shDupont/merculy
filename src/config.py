@@ -7,8 +7,14 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
     # Cookies
-    SESSION_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE= True
+    SESSION_COOKIE_HTTPONLY = True   # Prevent XSS attacks
+    SESSION_COOKIE_DOMAIN = None 
+
+    # Session configuration
+    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours in seconds
+    SESSION_REFRESH_EACH_REQUEST = True  # Extend session on each request
 
     # OAuth Configuration
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
