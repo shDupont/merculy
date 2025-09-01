@@ -56,8 +56,8 @@ def register():
         print(f"❌ [AUTH DEBUG] Registration error: {e}")
         return jsonify({'error': str(e)}), 500
 
-@cross_origin()
 @auth_bp.route('/login', methods=['POST'])
+@cross_origin()
 def login():
     """Login with email and password"""
     try:
