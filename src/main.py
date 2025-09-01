@@ -27,34 +27,27 @@ def create_app():
         app, 
         supports_credentials=True, 
         origins="*",
-        allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+        allow_headers=["Authorization", "Content-Type"],
         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         expose_headers=["Authorization"]
     )
     
-    # Additional CORS headers for complex requests
+    # # JWT Authentication debugging middleware
+    # @app.before_request
+    # def log_jwt_info():
+    #     """Log JWT authentication information for debugging"""
+    #     if request.endpoint and 'static' not in request.endpoint:
+    #         auth_header = request.headers.get('Authorization', 'None')
+    #         print(f"🔍 [JWT DEBUG] {request.method} {request.path}")
+    #         print(f"    Auth Header: {auth_header[:50]}..." if len(auth_header) > 50 else f"    Auth Header: {auth_header}")
+    #         print(f"    Endpoint: {request.endpoint}")
+    
     @app.after_request
     def after_request(response):
-        origin = request.headers.get('Origin')
-        if origin:
-            response.headers['Access-Control-Allow-Origin'] = origin
-        else:
-            response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,X-Requested-With'
-        response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
         return response
-
-    # Handle preflight OPTIONS requests
-    @app.before_request
-    def handle_preflight():
-        if request.method == "OPTIONS":
-            response = jsonify({'status': 'OK'})
-            response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-            response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,X-Requested-With'
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
-            return response
 
     # Register blueprints
     app.register_blueprint(user_bp, url_prefix='/api')
@@ -69,10 +62,8 @@ def create_app():
                 print("✅ Cosmos DB connection successful")
             else:
                 print("❌ Cosmos DB connection failed - check your configuration")
-                print("⚠️  App will continue but database operations may fail")
         except Exception as e:
             print(f"❌ Error connecting to Cosmos DB: {e}")
-            print("⚠️  App will continue but database operations may fail")
     
     # Health check endpoint
     @app.route('/health')
@@ -81,15 +72,6 @@ def create_app():
             'status': 'healthy',
             'message': 'Merculy Backend API is running',
             'version': '1.0.0'
-        }
-    
-    # CORS test endpoint
-    @app.route('/cors-test')
-    def cors_test():
-        return {
-            'message': 'CORS is working!',
-            'headers': dict(request.headers),
-            'origin': request.headers.get('Origin', 'Not provided')
         }
     
     # @app.route('/debug/jwt-info')
@@ -157,7 +139,5 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    # Use Azure's PORT environment variable or default to 8000
-    port = int(os.environ.get('PORT', 8000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=8000, debug=True)
 
