@@ -23,7 +23,15 @@ def create_app():
     app.config.from_object(Config)
     
     # Enable CORS for all routes with JWT token support
-    CORS(app, supports_credentials=True, allow_headers=["Authorization", "Content-Type"])
+    CORS(
+        app, 
+        supports_credentials=True, 
+        origins=[
+            'http://localhost:*'
+        ],
+        allow_headers=["Authorization", "Content-Type"],
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    )
     
     # JWT Authentication debugging middleware
     @app.before_request

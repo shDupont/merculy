@@ -63,6 +63,7 @@ class CosmosNewsArticle:
             self.source = article_data.get('source')
             self.url = article_data.get('url')
             self.topic = article_data.get('topic')
+            self.image_url = article_data.get('image_url')
             self.political_bias = article_data.get('political_bias')
             self.published_at = article_data.get('published_at')
             self.created_at = article_data.get('created_at')
@@ -75,6 +76,7 @@ class CosmosNewsArticle:
             self.source = None
             self.url = None
             self.topic = None
+            self.image_url = None
             self.political_bias = None
             self.published_at = None
             self.created_at = None
@@ -90,6 +92,7 @@ class CosmosNewsArticle:
             'source': self.source,
             'url': self.url,
             'topic': self.topic,
+            'image_url': self.image_url,
             'political_bias': self.political_bias,
             'published_at': self.published_at,
             'created_at': self.created_at
@@ -106,6 +109,7 @@ class CosmosNewsArticle:
             'source': self.source,
             'url': self.url,
             'topic': self.topic,
+            'image_url': self.image_url,
             'political_bias': self.political_bias,
             'published_at': self.published_at,
             'created_at': self.created_at,
@@ -191,7 +195,7 @@ class NewsArticleService:
     def __init__(self):
         self.cosmos_service = CosmosService()
     
-    def create_article(self, title, content, source, url, topic, 
+    def create_article(self, title, content, source, url, topic, image_url=None,
                       summary=None, bullet_point_highlights=None, political_bias=None, published_at=None):
         """Create a new news article"""
         try:
@@ -203,6 +207,7 @@ class NewsArticleService:
                 'source': source,
                 'url': url,
                 'topic': topic,
+                'image_url': image_url,
                 'political_bias': political_bias,
                 'published_at': published_at or datetime.utcnow().isoformat(),
                 'created_at': datetime.utcnow().isoformat()
