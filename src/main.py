@@ -29,7 +29,6 @@ def create_app():
         origins="*",
         allow_headers=["Authorization", "Content-Type"],
         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        supports_credentials=True,
         expose_headers=["Authorization"]
     )
 
@@ -84,26 +83,26 @@ def create_app():
             'version': '1.0.0'
         }
     
-    @app.route('/debug/jwt-info')
-    def jwt_info():
-        """Debug endpoint to check JWT authentication info"""
-        from src.services.jwt_service import get_current_user_from_token
+    # @app.route('/debug/jwt-info')
+    # def jwt_info():
+    #     """Debug endpoint to check JWT authentication info"""
+    #     from src.services.jwt_service import get_current_user_from_token
         
-        auth_header = request.headers.get('Authorization', 'None')
-        current_user = get_current_user_from_token()
+    #     auth_header = request.headers.get('Authorization', 'None')
+    #     current_user = get_current_user_from_token()
         
-        return jsonify({
-            'auth_header': auth_header[:50] + '...' if len(auth_header) > 50 else auth_header,
-            'user_authenticated': current_user is not None,
-            'user_id': getattr(current_user, 'id', None) if current_user else None,
-            'user_email': getattr(current_user, 'email', None) if current_user else None,
-            'headers': dict(request.headers),
-            'environment': {
-                'jwt_secret_configured': bool(app.config.get('JWT_SECRET_KEY')),
-                'jwt_expires_in': app.config.get('JWT_ACCESS_TOKEN_EXPIRES'),
-                'jwt_algorithm': app.config.get('JWT_ALGORITHM'),
-            }
-        })
+    #     return jsonify({
+    #         'auth_header': auth_header[:50] + '...' if len(auth_header) > 50 else auth_header,
+    #         'user_authenticated': current_user is not None,
+    #         'user_id': getattr(current_user, 'id', None) if current_user else None,
+    #         'user_email': getattr(current_user, 'email', None) if current_user else None,
+    #         'headers': dict(request.headers),
+    #         'environment': {
+    #             'jwt_secret_configured': bool(app.config.get('JWT_SECRET_KEY')),
+    #             'jwt_expires_in': app.config.get('JWT_ACCESS_TOKEN_EXPIRES'),
+    #             'jwt_algorithm': app.config.get('JWT_ALGORITHM'),
+    #         }
+    #     })
 
     
     # API info endpoint
