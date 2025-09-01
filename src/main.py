@@ -26,10 +26,7 @@ def create_app():
     CORS(
         app, 
         supports_credentials=True, 
-        origins=[
-            'http://localhost:*',
-            'https://merculy-app-hehte6a4ffc5hqeh.brazilsouth-01.azurewebsites.net'
-        ],
+        origins="*",
         allow_headers=["Authorization", "Content-Type"],
         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         supports_credentials=True,
