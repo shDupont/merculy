@@ -23,24 +23,24 @@ def create_app():
     app.config.from_object(Config)
     
     # Enable CORS for all routes with JWT token support
-    # CORS(
-    #     app, 
-    #     supports_credentials=True, 
-    #     origins="*",
-    #     allow_headers=["Authorization", "Content-Type"],
-    #     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    #     supports_credentials=True,
-    #     expose_headers=["Authorization"]
-    # )
-
     CORS(
-        app,
-        resources={
-            r"/api/*": {
-                "origins": "*", 
-                "allow_headers": ["Content-Type", "Authorization"]
-        }}
+        app, 
+        supports_credentials=True, 
+        origins="*",
+        allow_headers=["Authorization", "Content-Type"],
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        supports_credentials=True,
+        expose_headers=["Authorization"]
     )
+
+    # CORS(
+    #     app,
+    #     resources={
+    #         r"/api/*": {
+    #             "origins": "*", 
+    #             "allow_headers": ["Content-Type", "Authorization"]
+    #     }}
+    # )
     
     # # JWT Authentication debugging middleware
     # @app.before_request
@@ -52,12 +52,12 @@ def create_app():
     #         print(f"    Auth Header: {auth_header[:50]}..." if len(auth_header) > 50 else f"    Auth Header: {auth_header}")
     #         print(f"    Endpoint: {request.endpoint}")
     
-    @app.after_request
-    def after_request(response):
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-        return response
+    # @app.after_request
+    # def after_request(response):
+    #     response.headers.add('Access-Control-Allow-Origin', '*')
+    #     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    #     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    #     return response
 
     # Register blueprints
     app.register_blueprint(user_bp, url_prefix='/api')
