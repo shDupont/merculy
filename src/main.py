@@ -51,12 +51,12 @@ def create_app():
     #         print(f"    Auth Header: {auth_header[:50]}..." if len(auth_header) > 50 else f"    Auth Header: {auth_header}")
     #         print(f"    Endpoint: {request.endpoint}")
     
-    # @app.after_request
-    # def after_request(response):
-    #     response.headers.add('Access-Control-Allow-Origin', '*')
-    #     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    #     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    #     return response
+    @app.after_request
+    def after_request(response):
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        return response
 
     # Register blueprints
     app.register_blueprint(user_bp, url_prefix='/api')
@@ -143,24 +143,6 @@ def create_app():
                 }
             }
         }
-
-     # Serve frontend files
-    @app.route('/', defaults={'path': ''})
-    @app.route('/<path:path>')
-    def serve(path):
-        static_folder_path = app.static_folder
-        if static_folder_path is None:
-            return "Static folder not configured", 404
-
-        if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
-            return send_from_directory(static_folder_path, path)
-        else:
-            index_path = os.path.join(static_folder_path, 'index.html')
-            if os.path.exists(index_path):
-                return send_from_directory(static_folder_path, 'index.html')
-            else:
-                return "Frontend not available. This is a backend API.", 200
-    
     return app
 
 app = create_app()
