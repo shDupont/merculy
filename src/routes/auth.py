@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify, session, redirect, url_for
-from flask_cors import cross_origin
 from werkzeug.security import generate_password_hash, check_password_hash
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests

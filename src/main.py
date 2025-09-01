@@ -31,15 +31,6 @@ def create_app():
         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         expose_headers=["Authorization"]
     )
-
-    # CORS(
-    #     app,
-    #     resources={
-    #         r"/api/*": {
-    #             "origins": "*", 
-    #             "allow_headers": ["Content-Type", "Authorization"]
-    #     }}
-    # )
     
     # # JWT Authentication debugging middleware
     # @app.before_request
@@ -148,5 +139,5 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True)
 
