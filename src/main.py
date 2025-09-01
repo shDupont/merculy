@@ -3,8 +3,8 @@ import sys
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, jsonify, send_from_directory
-from flask_login import LoginManager
+from flask import Flask, jsonify, request, send_from_directory, session
+from flask_login import LoginManager, current_user
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -68,6 +68,24 @@ def create_app():
             'message': 'Merculy Backend API is running',
             'version': '1.0.0'
         }
+    
+    @app.route('/debug/session-info')
+    def session_info():
+        """Debug endpoint to check session and cookie info"""
+        return jsonify({
+            'session_data': dict(session),
+            'user_authenticated': current_user.is_authenticated,
+            'user_id': getattr(current_user, 'id', None) if current_user.is_authenticated else None,
+            'cookies': dict(request.cookies),
+            'headers': dict(request.headers),
+            'environment': {
+                'flask_env': app.config.get('FLASK_ENV'),
+                'azure_deployment': app.config.get('AZURE_DEPLOYMENT'),
+                'session_cookie_secure': app.config.get('SESSION_COOKIE_SECURE'),
+                'session_cookie_samesite': app.config.get('SESSION_COOKIE_SAMESITE'),
+            }
+    })
+
     
     # API info endpoint
     @app.route('/api')
