@@ -42,15 +42,15 @@ def create_app():
         }}
     )
     
-    # JWT Authentication debugging middleware
-    @app.before_request
-    def log_jwt_info():
-        """Log JWT authentication information for debugging"""
-        if request.endpoint and 'static' not in request.endpoint:
-            auth_header = request.headers.get('Authorization', 'None')
-            print(f"🔍 [JWT DEBUG] {request.method} {request.path}")
-            print(f"    Auth Header: {auth_header[:50]}..." if len(auth_header) > 50 else f"    Auth Header: {auth_header}")
-            print(f"    Endpoint: {request.endpoint}")
+    # # JWT Authentication debugging middleware
+    # @app.before_request
+    # def log_jwt_info():
+    #     """Log JWT authentication information for debugging"""
+    #     if request.endpoint and 'static' not in request.endpoint:
+    #         auth_header = request.headers.get('Authorization', 'None')
+    #         print(f"🔍 [JWT DEBUG] {request.method} {request.path}")
+    #         print(f"    Auth Header: {auth_header[:50]}..." if len(auth_header) > 50 else f"    Auth Header: {auth_header}")
+    #         print(f"    Endpoint: {request.endpoint}")
     
     # Register blueprints
     app.register_blueprint(user_bp, url_prefix='/api')
