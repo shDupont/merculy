@@ -25,11 +25,11 @@ class ArticleScraper:
         html = self._fetch_html(url)
         if not html:
             return None
-        
+
         doc = Document(html)
         title = doc.title()
-        content = doc.summary(html_partial=True)
-        
+        content = doc.summary()  # Pegando o conteúdo completo
+
         soup = BeautifulSoup(content, 'html.parser')
         return soup.get_text(separator='\n', strip=True)
 
@@ -38,18 +38,19 @@ class ArticleScraper:
             article = Article(url, config=self.config)
             article.download()
             article.parse()
+            article.nlp()  # Opcional, se quiser resumo/tags
             return article.text
         except Exception as e:
             print(f"Error scraping with newspaper3k for URL {url}: {e}")
             return None
 
     def scrape_article_content(self, url):
-        # Try with newspaper first as it's often more accurate
+        # Tenta primeiro com newspaper
         content = self.scrape_with_newspaper(url)
-        if content and len(content) > 200:  # Check for meaningful content length
+        if content and len(content) > 200:
             return content
-        
-        # Fallback to readability if newspaper fails or returns short content
+
+        # Fallback para readability se newspaper falhar ou retornar pouco conteúdo
         return self.scrape_with_readability(url)
 
 article_scraper = ArticleScraper()

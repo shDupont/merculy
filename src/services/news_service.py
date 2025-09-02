@@ -130,7 +130,7 @@ class NewsService:
                     if article.get('title') and article.get('description'):
                         
                         # Scrape the full article content
-                        full_content = article_scraper.scrape(article.get('url', ''))
+                        full_content = article_scraper.scrape_article_content(article.get('url', ''))
 
                         processed_article = {
                             'title': article['title'],
@@ -268,7 +268,7 @@ class NewsService:
                         if article.get('title') and article.get('description'):
                             
                             # Scrape the full article content
-                            full_content = article_scraper.scrape(article.get('url', ''))
+                            full_content = article_scraper.scrape_article_content(article.get('url', ''))
 
                             processed_article = {
                                 'title': article['title'],
@@ -308,7 +308,7 @@ class NewsService:
                 if article.get('title') and article.get('description'):
                     
                     # Scrape the full article content
-                    full_content = article_scraper.scrape(article.get('url', ''))
+                    full_content = article_scraper.scrape_article_content(article.get('url', ''))
 
                     processed_article = {
                         'title': article['title'],
@@ -342,7 +342,7 @@ class NewsService:
                 if article.get('title') and article.get('description'):
 
                     # Scrape the full article content
-                    full_content = article_scraper.scrape(article.get('url', ''))
+                    full_content = article_scraper.scrape_article_content(article.get('url', ''))
 
                     processed_article = {
                         'title': article['title'],

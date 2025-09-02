@@ -254,6 +254,7 @@ class CosmosService:
                 'source': article_data['source'],
                 'url': article_data['url'],
                 'topic': article_data['topic'],
+                'image_url': article_data.get('image_url'),
                 'political_bias': article_data.get('political_bias'),
                 'published_at': article_data['published_at'],
                 'created_at': datetime.utcnow().isoformat(),
