@@ -4,10 +4,29 @@ import json
 
 from src.models.cosmos_models import newsletter_service, news_article_service
 from src.services.news_service import news_service
+
+from src.services.article_scraper_service import article_scraper
 from src.services.gemini_service import gemini_service
 from src.services.cosmos_service import cosmos_service
 from src.services.jwt_service import jwt_required
 from src.config import Config
+
+news_bp = Blueprint('news', __name__)
+
+@news_bp.route('/articles/scrape', methods=['POST'])
+def scrape_article_content():
+    """Scrape and return the full article content from a given URL."""
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({'error': 'Missing url in request body'}), 400
+    url = data['url']
+    try:
+        content = article_scraper.scrape_article_content(url)
+        if not content:
+            return jsonify({'error': 'Could not extract article content'}), 422
+        return jsonify({'url': url, 'content': content}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 news_bp = Blueprint('news', __name__)
 
@@ -59,7 +78,10 @@ def get_detailed_topics():
                 {
                     'id': topic['id'],
                     'name': topic['name'],
-                    'isActive': topic.get('isActive', True)
+                    'isActive': topic.get('isActive', True),
+                    'icon': topic.get('icon', ''),
+                    'primary-color': topic.get('primary-color', ''),
+                    'secondary-color': topic.get('secondary-color', '')
                 }
                 for topic in cosmos_topics if topic.get('isActive', True)
             ]
@@ -366,9 +388,7 @@ def search_news(current_user):
 @jwt_required
 def generate_newsletter(current_user):
     """Generate personalized newsletter for current user based on article references"""
-    try:
-        data = request.get_json() or {}
-        
+    try:        
         # Get user interests
         user_interests = current_user.get_interests()
         if not user_interests:
@@ -538,6 +558,17 @@ def get_user_newsletters(current_user):
         # Calculate offset for pagination
         limit = per_page
         all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100)
+
+        all_returned_newsletters = []
+        for current_news in all_newsletters:
+            newsletter_data = newsletter_service.get_newsletter_with_articles(current_news.id, current_user.id)
+            
+            newsletter = newsletter_data['newsletter']
+            articles = newsletter_data['articles']
+            all_returned_newsletters.append({
+                "newsletter": newsletter.to_dict(),
+                "articles": [article.to_dict() for article in articles]
+            })
         
         # Filter by topic if specified
         if topic:
@@ -547,12 +578,12 @@ def get_user_newsletters(current_user):
         total = len(all_newsletters)
         start_idx = (page - 1) * per_page
         end_idx = start_idx + per_page
-        newsletters = all_newsletters[start_idx:end_idx]
+        newsletters = all_newsletters
         
         total_pages = (total + per_page - 1) // per_page
         
         return jsonify({
-            'newsletters': [n.to_dict() for n in newsletters],
+            'newsletters': all_returned_newsletters,
             'total': total,
             'pages': total_pages,
             'current_page': page

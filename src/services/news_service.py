@@ -4,6 +4,8 @@ from typing import List, Dict, Optional
 import json
 from src.config import Config
 from src.services.cosmos_service import cosmos_service
+from src.services.article_scraper_service import article_scraper
+
 
 class NewsService:
     def __init__(self):
@@ -126,9 +128,13 @@ class NewsService:
                 source_articles = []
                 for article in result['articles']:
                     if article.get('title') and article.get('description'):
+                        
+                        # Scrape the full article content
+                        full_content = article_scraper.scrape(article.get('url', ''))
+
                         processed_article = {
                             'title': article['title'],
-                            'content': article.get('description', '') + ' ' + article.get('content', ''),
+                            'content': full_content if full_content else article.get('description', '') + ' ' + article.get('content', ''),
                             'summary': article.get('description', ''),
                             'source': article.get('source', {}).get('name', 'Unknown'),
                             'url': article.get('url', ''),
@@ -260,9 +266,13 @@ class NewsService:
                     articles = []
                     for article in result['articles']:
                         if article.get('title') and article.get('description'):
+                            
+                            # Scrape the full article content
+                            full_content = article_scraper.scrape(article.get('url', ''))
+
                             processed_article = {
                                 'title': article['title'],
-                                'content': article.get('description', '') + ' ' + article.get('content', ''),
+                                'content': full_content if full_content else article.get('description', '') + ' ' + article.get('content', ''),
                                 'summary': article.get('description', ''),
                                 'source': article.get('source', {}).get('name', 'Unknown'),
                                 'url': article.get('url', ''),
@@ -296,9 +306,13 @@ class NewsService:
             articles = []
             for article in result['articles']:
                 if article.get('title') and article.get('description'):
+                    
+                    # Scrape the full article content
+                    full_content = article_scraper.scrape(article.get('url', ''))
+
                     processed_article = {
                         'title': article['title'],
-                        'content': article.get('description', '') + ' ' + article.get('content', ''),
+                        'content': full_content if full_content else article.get('description', '') + ' ' + article.get('content', ''),
                         'summary': article.get('description', ''),
                         'source': article.get('source', {}).get('name', 'Unknown'),
                         'url': article.get('url', ''),
@@ -326,9 +340,13 @@ class NewsService:
             articles = []
             for article in result['articles']:
                 if article.get('title') and article.get('description'):
+
+                    # Scrape the full article content
+                    full_content = article_scraper.scrape(article.get('url', ''))
+
                     processed_article = {
                         'title': article['title'],
-                        'content': article.get('description', '') + ' ' + article.get('content', ''),
+                        'content': full_content if full_content else article.get('description', '') + ' ' + article.get('content', ''),
                         'summary': article.get('description', ''),
                         'source': article.get('source', {}).get('name', source),
                         'url': article.get('url', ''),
