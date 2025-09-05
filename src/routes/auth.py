@@ -26,6 +26,8 @@ def register():
         if existing_user:
             return jsonify({'error': 'User already exists'}), 409
         
+        print(f"[DEBUG] followed: {data.get("followed_channels")}")
+
         # Create new user
         user = user_service.create_user(
             email=data['email'],
@@ -33,7 +35,8 @@ def register():
             password=data['password'],
             interests=data.get('interests', []),
             newsletter_format=data.get('newsletter_format', 'single'),
-            delivery_schedule=data.get('delivery_schedule')
+            delivery_schedule=data.get('delivery_schedule'),
+            followed_channels=data.get('followed_channels')
         )
         
         if not user:
@@ -280,6 +283,9 @@ def update_profile(current_user):
         
         if data.get('delivery_schedule'):
             updates['delivery_schedule'] = data['delivery_schedule']
+
+        if data.get('followed_channels'):
+            updates['followed_channels'] = data['followed_channels']
         
         updated_user = user_service.update_user(current_user.email, **updates)
         
