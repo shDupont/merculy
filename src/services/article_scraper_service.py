@@ -2,9 +2,28 @@ import requests
 from bs4 import BeautifulSoup
 from readability import Document
 from newspaper import Article, Config
+import nltk
+import os
+
+# Download required NLTK data if not already present
+def ensure_nltk_data():
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        print("Downloading NLTK punkt tokenizer...")
+        nltk.download('punkt', quiet=True)
+    
+    try:
+        nltk.data.find('tokenizers/punkt_tab')
+    except LookupError:
+        print("Downloading NLTK punkt_tab tokenizer...")
+        nltk.download('punkt_tab', quiet=True)
 
 class ArticleScraper:
     def __init__(self):
+        # Ensure NLTK data is available
+        ensure_nltk_data()
+        
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
