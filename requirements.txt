@@ -33,7 +33,7 @@ gunicorn==22.0.0
 beautifulsoup4==4.12.3
 readability-lxml==0.8.1
 newspaper3k==0.2.8
-lxml==5.2.2
+lxml[html_clean]==5.2.2
 html5lib==1.1
 nltk==3.8.1
-
+PyJWT==2.10.1

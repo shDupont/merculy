@@ -9,15 +9,16 @@ import os
 def ensure_nltk_data():
     try:
         nltk.data.find('tokenizers/punkt')
+        nltk.download('punkt', download_dir='/home/codespace/nltk_data')
     except LookupError:
         print("Downloading NLTK punkt tokenizer...")
-        nltk.download('punkt', quiet=True)
+        nltk.download('punkt', download_dir='/home/codespace/nltk_data')
     
     try:
-        nltk.data.find('tokenizers/punkt_tab')
+        nltk.data.find('tokenizers/punkt')
     except LookupError:
         print("Downloading NLTK punkt_tab tokenizer...")
-        nltk.download('punkt_tab', quiet=True)
+        nltk.download('punkt', download_dir='/home/codespace/nltk_data')
 
 class ArticleScraper:
     def __init__(self):
