@@ -556,15 +556,23 @@ def get_user_newsletters(current_user):
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         topic = request.args.get('topic')
+
+        # Get parameter saved triggers filtering of saved user newsletters
+        do_get_saved = request.args.get('saved', 'false', type=str)
+
+        print(f"[DEBUG]- Get saved news?\n {'YES' if do_get_saved == 'true' else 'NO'}")
         
         # Calculate offset for pagination
         limit = per_page
-        all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100)
+        all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100, saved=do_get_saved=='true')
 
         all_returned_newsletters = []
         for current_news in all_newsletters:
             newsletter_data = newsletter_service.get_newsletter_with_articles(current_news.id, current_user.id)
             
+            print('[DEBUG] - Raw data')
+            print(newsletter_data)
+
             newsletter = newsletter_data['newsletter']
             articles = newsletter_data['articles']
             all_returned_newsletters.append({
@@ -593,6 +601,29 @@ def get_user_newsletters(current_user):
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@news_bp.route('/newsletters/<newsletter_id>/toggle-save', methods=['POST'])
+@jwt_required
+def toggle_newsletter_saved(current_user, newsletter_id):
+    """Toggle the saved status of a newsletter"""
+    try:
+        updated_newsletter = newsletter_service.toggle_newsletter_saved(newsletter_id, current_user.id)
+        
+        if not updated_newsletter:
+            return jsonify({
+                'error': 'Newsletter not found or could not be updated'
+            }), 404
+        
+        return jsonify({
+            'message': f"Newsletter {'saved' if updated_newsletter.saved else 'unsaved'} successfully",
+            'newsletter_id': newsletter_id,
+            'saved': updated_newsletter.saved,
+            'newsletter': updated_newsletter.to_dict()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @news_bp.route('/newsletters/<newsletter_id>/save', methods=['POST'])
 @jwt_required
@@ -653,16 +684,24 @@ def delete_newsletter(current_user, newsletter_id):
 @news_bp.route('/newsletters/saved', methods=['GET'])
 @jwt_required
 def get_saved_newsletters(current_user):
-    """Get user's newsletters - 'Saved' concept deprecated with new model"""
+    """Get user's saved newsletters"""
     try:
-        # With the new model, all newsletters are simply user's newsletters
-        # The concept of 'saved' vs 'unsaved' is no longer relevant
-        newsletters = newsletter_service.get_user_newsletters(current_user.id)
+        # Get only saved newsletters by using the saved=True parameter
+        newsletters = newsletter_service.get_user_newsletters(current_user.id, saved=True)
+        
+        # Get full newsletter data with articles for each saved newsletter
+        saved_newsletters_with_articles = []
+        for newsletter in newsletters:
+            newsletter_data = newsletter_service.get_newsletter_with_articles(newsletter.id, current_user.id)
+            if newsletter_data:
+                saved_newsletters_with_articles.append({
+                    "newsletter": newsletter_data['newsletter'].to_dict(),
+                    "articles": [article.to_dict() for article in newsletter_data['articles']]
+                })
         
         return jsonify({
-            'newsletters': [n.to_dict() for n in newsletters],
-            'count': len(newsletters),
-            'note': 'All newsletters are now persistent article collections'
+            'newsletters': saved_newsletters_with_articles,
+            'count': len(saved_newsletters_with_articles)
         }), 200
         
     except Exception as e:
