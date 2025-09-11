@@ -17,16 +17,16 @@ def register():
     """Register a new user with email and password"""
     try:
         data = request.get_json()
-        
+
         if not data or not data.get('email') or not data.get('password') or not data.get('name'):
             return jsonify({'error': 'Email, password and name are required'}), 400
-        
+
         # Check if user already exists
         existing_user = user_service.get_user_by_email(data['email'])
         if existing_user:
             return jsonify({'error': 'User already exists'}), 409
-        
-        print(f"[DEBUG] followed: {data.get("followed_channels")}")
+
+        print(f"[DEBUG] followed: {data.get('followed_channels')}")
 
         # Create new user
         user = user_service.create_user(
@@ -38,22 +38,22 @@ def register():
             delivery_schedule=data.get('delivery_schedule'),
             followed_channels=data.get('followed_channels')
         )
-        
+
         if not user:
             return jsonify({'error': 'Failed to create user'}), 500
-        
+
         # Generate JWT token
         token = jwt_service.generate_token(user.id, user.email)
         if not token:
             return jsonify({'error': 'Failed to generate authentication token'}), 500
-        
+
         return jsonify({
             'message': 'User registered successfully',
             'user': user.to_dict(),
             'token': token,
             'token_type': 'Bearer'
         }), 201
-        
+
     except Exception as e:
         print(f"❌ [AUTH DEBUG] Registration error: {e}")
         return jsonify({'error': str(e)}), 500
