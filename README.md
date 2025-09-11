@@ -375,3 +375,12 @@ Para suporte técnico:
 - ✅ Geração de newsletters personalizadas
 - ✅ Sistema de moderação de conteúdo
 
+## AWS Deploy
+
+docker buildx build -t merculy/api .
+
+docker tag merculy/api:latest 431742751467.dkr.ecr.us-east-1.amazonaws.com/merculy/api:latest
+
+docker push 431742751467.dkr.ecr.us-east-1.amazonaws.com/merculy/api:latest
+
+https://us-east-1.console.aws.amazon.com/ecs/v2/clusters/merculy/services/merculy-family-service-yoxp1077/tasks?region=us-east-1
