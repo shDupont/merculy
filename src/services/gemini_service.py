@@ -65,13 +65,13 @@ class GeminiService:
     def generate_bullet_point_highlights(self, title: str, content: str) -> Optional[List[str]]:
         """Generate bullet point highlights for a news article"""
         prompt = f"""
-        Crie exatamente 3 bullet points destacando os principais aspectos do seguinte artigo de notícias.
+        Crie exatamente 3 frases destacando os principais aspectos do seguinte artigo de notícias.
         Cada bullet point deve ser uma frase concisa e informativa.
         
         Título: {title}
         Conteúdo: {content}
         
-        Responda APENAS com os 3 bullet points, um por linha, iniciando cada um com "• ":
+        Responda APENAS com os 3 frases, uma por linha, sem marcação de lista:
         """
         
         result = self._make_request(prompt)
@@ -82,12 +82,10 @@ class GeminiService:
             
             for line in lines:
                 # Ensure it starts with bullet point
-                if line.startswith('• '):
+                if line.startswith('• ') or line.startswith('- ') or line.startswith('* '):
+                    bullet_points.append(line[2:])
+                elif line:
                     bullet_points.append(line)
-                elif line.startswith('- ') or line.startswith('* '):
-                    bullet_points.append('• ' + line[2:])
-                elif line and not line.startswith('•'):
-                    bullet_points.append('• ' + line)
             
             # Return exactly 3 bullet points
             return bullet_points[:3] if len(bullet_points) >= 3 else bullet_points

@@ -470,7 +470,7 @@ def generate_newsletter(current_user):
             newsletter = newsletter_service.create_newsletter(
                 user_id=current_user.id,
                 title=f"Newsletter Personalizada - {datetime.now().strftime('%d/%m/%Y')}",
-                topic='personalizada',
+                topic='personalizada' if len(user_interests) > 1 else user_interests[0],
                 articles=article_ids
             )
             
@@ -555,7 +555,7 @@ def get_user_newsletters(current_user):
     try:
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
-        topic = request.args.get('topic')
+        topic = request.args.get('topic', '')
 
         # Get parameter saved triggers filtering of saved user newsletters
         do_get_saved = request.args.get('saved', 'false', type=str)
@@ -568,34 +568,46 @@ def get_user_newsletters(current_user):
 
         all_returned_newsletters = []
         for current_news in all_newsletters:
-            newsletter_data = newsletter_service.get_newsletter_with_articles(current_news.id, current_user.id)
+            print(f'[DEBUG] {current_news.topic}')
+            print(f'[DEBUG] {topic}')
+            if(topic != ''):
+                if(current_news.topic == topic):
+                    all_returned_newsletters.append(
+                        current_news.to_dict()
+                    )
+            else:
+               if(current_news.topic == topic):
+                    all_returned_newsletters.append(
+                        current_news.to_dict()
+                    ) 
+            # newsletter_data = newsletter_service.get_newsletter_with_articles(current_news.id, current_user.id)
             
-            print('[DEBUG] - Raw data')
-            print(newsletter_data)
+            # print('[DEBUG] - Raw data')
+            # print(newsletter_data)
 
-            newsletter = newsletter_data['newsletter']
-            articles = newsletter_data['articles']
-            all_returned_newsletters.append({
-                "newsletter": newsletter.to_dict(),
-                "articles": [article.to_dict() for article in articles]
-            })
+            # newsletter = newsletter_data['newsletter']
+            # articles = newsletter_data['articles']
+            # all_returned_newsletters.append({
+            #     "newsletter": current_news.to_dict(),
+            #     "articles": [article.to_dict() for article in articles]
+            # })
         
         # Filter by topic if specified
-        if topic:
-            all_newsletters = [n for n in all_newsletters if n.topic == topic]
+        # if topic:
+        #     all_newsletters = [n for n in all_newsletters if n.topic == topic]
         
         # Calculate pagination
-        total = len(all_newsletters)
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        newsletters = all_newsletters
+        # total = len(all_newsletters)
+        # start_idx = (page - 1) * per_page
+        # end_idx = start_idx + per_page
+        # newsletters = all_newsletters
         
-        total_pages = (total + per_page - 1) // per_page
+        # total_pages = (total + per_page - 1) // per_page
         
         return jsonify({
             'newsletters': all_returned_newsletters,
-            'total': total,
-            'pages': total_pages,
+            'total': 1,
+            'pages': 1,
             'current_page': page
         }), 200
         
@@ -705,6 +717,46 @@ def get_saved_newsletters(current_user):
         }), 200
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@news_bp.route('/newsletters/topics-count', methods=['GET'])
+@jwt_required
+def get_newsletters_count_by_topics(current_user):
+    """Get count of newsletters for each of the user's interested topics"""
+    try:
+        # Get user's interests
+        user_interests = current_user.get_interests()
+        print(f"[DEBUG] User {current_user.id} interests: {user_interests}")
+        
+        if not user_interests or not isinstance(user_interests, list):
+            return jsonify({
+                'message': 'No interests found for user',
+                'topics_count': []
+            }), 200
+        
+        # Get newsletter count for each topic
+        topics_count = []
+        for topic in user_interests:
+            count = cosmos_service.count_newsletters_by_topic(current_user.id, topic)
+            topics_count.append({
+                'topic': topic,
+                'count': count
+            })
+        personalized_count = cosmos_service.count_newsletters_by_topic(current_user.id, 'personalizada')
+        topics_count.append({
+            'topic': 'personalizada',
+            'count': personalized_count
+        })
+        print(f"[DEBUG] Topics count result: {topics_count}")
+        
+        return jsonify({
+            'topics_count': topics_count,
+            'total_topics': len(topics_count),
+            'user_id': current_user.id
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting newsletters count by topics: {e}")
         return jsonify({'error': str(e)}), 500
 
 @news_bp.route('/preferences/topics', methods=['GET'])

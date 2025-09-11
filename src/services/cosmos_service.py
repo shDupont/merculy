@@ -437,6 +437,32 @@ class CosmosService:
                         break
                     
         return channel_domains if channel_domains else None
+    
+    def count_newsletters_by_topic(self, user_id, topic):
+        """Count newsletters for a specific user and topic"""
+        if not self.is_available():
+            return 0
+        
+        try:
+            container = self.database.get_container_client('newsletters')
+            query = """
+                SELECT VALUE COUNT(1) FROM c 
+                WHERE c.user_id = @user_id 
+                AND c.type = 'newsletter' 
+                AND c.topic = @topic
+            """
+            items = list(container.query_items(
+                query=query,
+                parameters=[
+                    {"name": "@user_id", "value": str(user_id)},
+                    {"name": "@topic", "value": topic}
+                ],
+                partition_key=str(user_id)
+            ))
+            return items[0] if items else 0
+        except Exception as e:
+            print(f"Error counting newsletters by topic from Cosmos DB: {e}")
+            return 0
         
 # Global instance
 cosmos_service = CosmosService()
