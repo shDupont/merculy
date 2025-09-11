@@ -17,6 +17,7 @@ class CosmosNewsletter:
             self.topic = newsletter_data.get('topic')
             self.created_at = newsletter_data.get('created_at')
             self.articles = newsletter_data.get('articles', [])  # List of article IDs
+            self.saved = newsletter_data.get('saved', False)
         else:
             self.id = None
             self.user_id = None
@@ -24,6 +25,7 @@ class CosmosNewsletter:
             self.topic = None
             self.created_at = None
             self.articles = []
+            self.saved = False
     
     def to_dict(self):
         """Convert newsletter to dictionary for API responses"""
@@ -34,7 +36,8 @@ class CosmosNewsletter:
             'topic': self.topic,
             'created_at': self.created_at,
             'articles': self.articles,
-            'article_count': len(self.articles) if self.articles else 0
+            'article_count': len(self.articles) if self.articles else 0,
+            'saved': self.saved
         }
     
     def to_cosmos_dict(self):
@@ -46,7 +49,8 @@ class CosmosNewsletter:
             'topic': self.topic,
             'created_at': self.created_at,
             'articles': self.articles,
-            'type': 'newsletter'
+            'type': 'newsletter',
+            'saved': self.saved
         }
 
 
@@ -131,7 +135,8 @@ class NewsletterService:
                 'title': title,
                 'topic': topic,
                 'articles': articles,  # List of article IDs
-                'created_at': datetime.utcnow().isoformat()
+                'created_at': datetime.utcnow().isoformat(),
+                'saved': False
             }
             
             cosmos_newsletter = self.cosmos_service.create_newsletter(newsletter_data)
@@ -143,10 +148,10 @@ class NewsletterService:
             print(f"Error creating newsletter: {e}")
             return None
     
-    def get_user_newsletters(self, user_id, limit=50):
+    def get_user_newsletters(self, user_id, limit=50, saved=False):
         """Get newsletters for a user"""
         try:
-            cosmos_newsletters = self.cosmos_service.get_user_newsletters(str(user_id), limit)
+            cosmos_newsletters = self.cosmos_service.get_user_newsletters(str(user_id), limit, saved)
             return [CosmosNewsletter(newsletter) for newsletter in cosmos_newsletters]
         except Exception as e:
             print(f"Error getting user newsletters: {e}")
@@ -178,6 +183,35 @@ class NewsletterService:
         except Exception as e:
             print(f"Error getting newsletter with articles: {e}")
             return None
+        
+        
+    def toggle_newsletter_saved(self, newsletter_id, user_id):
+        """Toggle the saved status of a newsletter"""
+        try:
+            # Get the current newsletter
+            newsletter = self.cosmos_service.get_newsletter_by_id(newsletter_id, str(user_id))
+            if not newsletter:
+                return None
+            
+            # Toggle the saved status
+            current_saved = newsletter.get('saved', False)
+            new_saved = not current_saved
+
+            # Update fields
+            newsletter['saved'] = new_saved
+            
+            # Update the newsletter
+            update_data = newsletter
+            updated_newsletter = self.cosmos_service.update_newsletter(newsletter_id, str(user_id), update_data)
+            
+            if updated_newsletter:
+                return CosmosNewsletter(updated_newsletter)
+            return None
+            
+        except Exception as e:
+            print(f"Error toggling newsletter saved status: {e}")
+            return None
+
     
     def delete_newsletter(self, newsletter_id, user_id):
         """Delete a newsletter"""

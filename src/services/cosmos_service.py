@@ -175,6 +175,7 @@ class CosmosService:
                 'topic': newsletter_data.get('topic'),
                 'articles': newsletter_data.get('articles', []),  # List of article IDs
                 'created_at': datetime.utcnow().isoformat(),
+                'saved': newsletter_data.get('saved', False),
                 'type': 'newsletter'
             }
             
@@ -183,14 +184,19 @@ class CosmosService:
             print(f"Error creating newsletter in Cosmos DB: {e}")
             return None
     
-    def get_user_newsletters(self, user_id, limit=50):
+    def get_user_newsletters(self, user_id, limit=50, saved=False):
         """Get newsletters for a user from Cosmos DB"""
         if not self.is_available():
             return []
         
         try:
             container = self.database.get_container_client('newsletters')
-            query = "SELECT * FROM c WHERE c.user_id = @user_id AND c.type = 'newsletter' ORDER BY c.created_at DESC"
+            query = f"""
+                SELECT * FROM c 
+                WHERE c.user_id = @user_id 
+                AND c.type = 'newsletter' 
+                {'AND c.saved = true' if saved else ''} 
+                ORDER BY c.created_at DESC"""
             items = list(container.query_items(
                 query=query,
                 parameters=[{"name": "@user_id", "value": str(user_id)}],
@@ -222,6 +228,32 @@ class CosmosService:
             return items[0] if items else None
         except Exception as e:
             print(f"Error getting newsletter by ID from Cosmos DB: {e}")
+            return None
+
+    def update_newsletter(self, newsletter_id, user_id, update_data):
+        """Update a newsletter"""
+        if not self.is_available():
+            return None
+        
+        try:
+            container = self.database.get_container_client('newsletters')
+            
+            # First get the existing newsletter
+            existing_newsletter = self.get_newsletter_by_id(newsletter_id, user_id)
+            if not existing_newsletter:
+                return None
+            
+            # Update the newsletter with new data
+            existing_newsletter.update(update_data)
+            
+            # Replace the item in Cosmos DB
+            updated_item = container.replace_item(
+                item=newsletter_id,
+                body=existing_newsletter
+            )
+            return updated_item
+        except Exception as e:
+            print(f"Error updating newsletter in Cosmos DB: {e}")
             return None
     
     def delete_newsletter(self, newsletter_id, user_id):
