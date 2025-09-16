@@ -426,27 +426,27 @@ def generate_newsletter(current_user):
             article_ids = []
             
             # Process articles and collect IDs
+            article_count = 0
             for topic_articles in news_by_topic.values():
                 for article in topic_articles:
                     # Process article with AI if available
                     if gemini_service.is_available():
-                        summary = gemini_service.summarize_article(article['title'], article['content'])
+                        summary = gemini_service.summarize_article(article['title'], article['content'][:400])
                         if summary:
                             article['summary'] = summary
                         
                         # Generate bullet point highlights
-                        bullet_highlights = gemini_service.generate_bullet_point_highlights(article['title'], article['content'])
+                        bullet_highlights = gemini_service.generate_bullet_point_highlights(article['title'], article['content'][:400])
                         if bullet_highlights:
                             article['bullet_point_highlights'] = bullet_highlights
-                        
-                        # Analyze political bias
-                        bias = gemini_service.analyze_political_bias(article['title'], article['content'])
-                        article['political_bias'] = bias
                     
                     all_articles.append(article)
                     
                     # Save to Cosmos DB and collect article ID
                     try:
+                        # Set bias analysis status for first 3 articles
+                        bias_status = 'generating' if article_count < 3 else 'not_eligible'
+                        
                         created_article = news_article_service.create_article(
                             title=article['title'],
                             content=article['content'],
@@ -455,13 +455,22 @@ def generate_newsletter(current_user):
                             topic=article.get('topic', 'geral'),
                             image_url=article.get('image_url', ''),
                             summary=article.get('summary'),
-                            bullet_point_highlights=article.get('bullet_point_highlights'),
                             political_bias=article.get('political_bias'),
                             published_at=article.get('published_at')
                         )
                         
                         if created_article and created_article.id:
                             article_ids.append(created_article.id)
+                            
+                            # Update bias analysis status in the created article
+                            cosmos_service.update_article_bias_status(created_article.id, bias_status)
+                            
+                            # Start comprehensive bias analysis for first 3 articles
+                            if article_count < 3 and gemini_service.is_available():
+                                print(f"[NEWSLETTER] Starting bias analysis for article {article_count + 1}: {created_article.id}")
+                                gemini_service.analyze_comprehensive_bias(created_article)
+                            
+                            article_count += 1
                             
                     except Exception as e:
                         print(f"Error saving article to Cosmos DB: {e}")
@@ -487,6 +496,8 @@ def generate_newsletter(current_user):
         else:
             # Generate newsletter by topic
             newsletters = []
+            global_article_count = 0  # Track articles across all topics for bias analysis
+            
             for topic, articles in news_by_topic.items():
                 article_ids = []
                 
@@ -509,6 +520,9 @@ def generate_newsletter(current_user):
                     
                     # Save to Cosmos DB and collect article ID
                     try:
+                        # Set bias analysis status for first 3 articles across all topics
+                        bias_status = 'generating' if global_article_count < 3 else 'not_eligible'
+                        
                         created_article = news_article_service.create_article(
                             title=article['title'],
                             content=article['content'],
@@ -524,6 +538,16 @@ def generate_newsletter(current_user):
                         
                         if created_article and created_article.id:
                             article_ids.append(created_article.id)
+                            
+                            # Update bias analysis status in the created article
+                            cosmos_service.update_article_bias_status(created_article.id, bias_status)
+                            
+                            # Start comprehensive bias analysis for first 3 articles
+                            if global_article_count < 3 and gemini_service.is_available():
+                                print(f"[NEWSLETTER] Starting bias analysis for article {global_article_count + 1}: {created_article.id}")
+                                gemini_service.analyze_comprehensive_bias(created_article)
+                            
+                            global_article_count += 1
                             
                     except Exception as e:
                         print(f"Error saving article to Cosmos DB: {e}")
@@ -568,18 +592,15 @@ def get_user_newsletters(current_user):
 
         all_returned_newsletters = []
         for current_news in all_newsletters:
-            print(f'[DEBUG] {current_news.topic}')
-            print(f'[DEBUG] {topic}')
             if(topic != ''):
                 if(current_news.topic == topic):
                     all_returned_newsletters.append(
                         current_news.to_dict()
                     )
             else:
-               if(current_news.topic == topic):
-                    all_returned_newsletters.append(
-                        current_news.to_dict()
-                    ) 
+                all_returned_newsletters.append(
+                    current_news.to_dict()
+                ); 
             # newsletter_data = newsletter_service.get_newsletter_with_articles(current_news.id, current_user.id)
             
             # print('[DEBUG] - Raw data')
@@ -656,8 +677,10 @@ def save_newsletter(newsletter_id):
 @news_bp.route('/newsletters/<newsletter_id>', methods=['GET'])
 @jwt_required
 def get_newsletter_details(current_user, newsletter_id):
-    """Get newsletter details with populated articles"""
+    """Get newsletter details with populated articles and bias analysis for first 3 articles"""
     try:
+        from src.models.cosmos_models import related_source_service
+        
         newsletter_data = newsletter_service.get_newsletter_with_articles(newsletter_id, current_user.id)
         
         if not newsletter_data:
@@ -665,11 +688,84 @@ def get_newsletter_details(current_user, newsletter_id):
         
         newsletter = newsletter_data['newsletter']
         articles = newsletter_data['articles']
+
+        # Process first 3 articles for bias analysis
+        processed_articles = []
+        for i, article in enumerate(articles):
+            article_dict = article.to_dict()
+            
+            # Add bias analysis for first 3 articles
+            if i < 3 and article.bias_analysis_status == 'available':
+                try:
+                    # Get related sources for this article
+                    related_sources = related_source_service.get_related_sources_by_article(article.id)
+                    
+                    if related_sources:
+                        # Calculate bias distribution
+                        bias_distribution = {'esquerda': 0, 'centro': 0, 'direita': 0}
+                        related_sources_data = []
+                        
+                        for source in related_sources:
+                            source_dict = source.to_dict()
+                            related_sources_data.append(source_dict)
+                            
+                            # Count bias distribution
+                            bias = source_dict.get('political_bias', 'centro')
+                            if bias in bias_distribution:
+                                bias_distribution[bias] += 1
+                        
+                        # Add bias analysis data to article
+                        article_dict['bias_analysis'] = {
+                            'status': 'available',
+                            'related_sources': related_sources_data,
+                            'bias_distribution': bias_distribution,
+                            'total_sources': len(related_sources_data),
+                            'distribution_summary': {
+                                'left_percentage': round((bias_distribution['esquerda'] / len(related_sources_data)) * 100, 1) if related_sources_data else 0,
+                                'center_percentage': round((bias_distribution['centro'] / len(related_sources_data)) * 100, 1) if related_sources_data else 0,
+                                'right_percentage': round((bias_distribution['direita'] / len(related_sources_data)) * 100, 1) if related_sources_data else 0
+                            }
+                        }
+                    else:
+                        article_dict['bias_analysis'] = {
+                            'status': article.bias_analysis_status,
+                            'message': 'No related sources found'
+                        }
+                        
+                except Exception as e:
+                    print(f"Error getting bias analysis for article {article.id}: {e}")
+                    article_dict['bias_analysis'] = {
+                        'status': 'error',
+                        'message': 'Error retrieving bias analysis'
+                    }
+            elif i < 3:
+                # For first 3 articles that don't have analysis available yet
+                article_dict['bias_analysis'] = {
+                    'status': article.bias_analysis_status,
+                    'message': {
+                        'generating': 'Bias analysis is being generated',
+                        'not_eligible': 'Article not eligible for bias analysis',
+                        'error': 'Error occurred during bias analysis'
+                    }.get(article.bias_analysis_status, 'Unknown status')
+                }
+            else:
+                # For articles beyond the first 3
+                article_dict['bias_analysis'] = {
+                    'status': 'not_eligible',
+                    'message': 'Bias analysis only performed on first 3 articles'
+                }
+            
+            processed_articles.append(article_dict)
         
         return jsonify({
             'newsletter': newsletter.to_dict(),
-            'articles': [article.to_dict() for article in articles],
-            'article_count': len(articles)
+            'articles': processed_articles,
+            'article_count': len(articles),
+            'bias_analysis_info': {
+                'analyzed_articles': min(3, len(articles)),
+                'total_articles': len(articles),
+                'note': 'Comprehensive bias analysis is performed only on the first 3 articles'
+            }
         }), 200
         
     except Exception as e:
