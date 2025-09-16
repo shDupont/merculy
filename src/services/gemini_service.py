@@ -1,5 +1,6 @@
 import requests
 import json
+import threading
 from typing import List, Dict, Optional
 from src.config import Config
 
@@ -115,6 +116,103 @@ class GeminiService:
                 return 'centro'
         return 'centro'  # Default fallback
     
+    def analyze_comprehensive_bias(self, article_obj):
+        """
+        Perform comprehensive political bias analysis by searching for related articles
+        and analyzing their bias. This function runs asynchronously.
+        
+        Args:
+            article_obj: CosmosNewsArticle object
+        """
+        def _async_analysis():
+            try:
+                from src.services.news_service import news_service
+                from src.models.cosmos_models import related_source_service
+                from src.services.cosmos_service import cosmos_service
+                
+                print(f"[BIAS ANALYSIS] Starting analysis for article: {article_obj.id}")
+                
+                # Update status to generating
+                cosmos_service.update_article_bias_status(article_obj.id, 'generating')
+                
+                # Search for related articles using the first 4 words of the title
+                title_words = article_obj.title.split()[:4]
+                search_query = ' '.join(title_words)
+                print(f"[BIAS ANALYSIS] Search query: '{search_query}' (from title: '{article_obj.title}')")
+                related_articles = news_service.search_news(search_query, limit=3)
+                
+                if not related_articles:
+                    print(f"[BIAS ANALYSIS] No related articles found for: {article_obj.title}")
+                    cosmos_service.update_article_bias_status(article_obj.id, 'error')
+                    return
+                
+                # Filter out articles from the same source to ensure diversity
+                diverse_articles = []
+                for article in related_articles:
+                    if article.get('source', '').lower() != article_obj.source.lower():
+                        diverse_articles.append(article)
+                    if len(diverse_articles) >= 8:  # Limit to 8 diverse sources
+                        break
+                
+                if not diverse_articles:
+                    print(f"[BIAS ANALYSIS] No diverse sources found for: {article_obj.title}")
+                    cosmos_service.update_article_bias_status(article_obj.id, 'error')
+                    return
+                
+                # Analyze each related article for political bias
+                related_sources_created = 0
+                for related_article in diverse_articles:
+                    try:
+                        # Get the first paragraph as news quote
+                        content = related_article.get('content', '')
+                        paragraphs = content.split('\n')
+                        news_quote = paragraphs[0] if paragraphs else content[:200]
+                        
+                        # Analyze political bias
+                        bias = self.analyze_political_bias(
+                            related_article.get('title', ''),
+                            content[:400]
+                        )
+                        
+                        # Create related source record
+                        related_source = related_source_service.create_related_source(
+                            article_id=article_obj.id,
+                            title=related_article.get('title', ''),
+                            political_bias=bias,
+                            published_at=related_article.get('published_at', ''),
+                            news_quote=news_quote,
+                            source=related_article.get('source', '')
+                        )
+                        
+                        if related_source:
+                            related_sources_created += 1
+                            print(f"[BIAS ANALYSIS] Created related source {related_sources_created}: {bias}")
+                            
+                    except Exception as e:
+                        print(f"[BIAS ANALYSIS] Error processing related article: {e}")
+                        continue
+                
+                # Update status based on results
+                if related_sources_created > 0:
+                    cosmos_service.update_article_bias_status(article_obj.id, 'available')
+                    print(f"[BIAS ANALYSIS] Completed analysis for article: {article_obj.id} with {related_sources_created} sources")
+                else:
+                    cosmos_service.update_article_bias_status(article_obj.id, 'error')
+                    print(f"[BIAS ANALYSIS] Failed to create any related sources for: {article_obj.id}")
+                
+            except Exception as e:
+                print(f"[BIAS ANALYSIS] Error in comprehensive analysis: {e}")
+                try:
+                    cosmos_service.update_article_bias_status(article_obj.id, 'error')
+                except:
+                    pass
+        
+        # Run the analysis in a separate thread (async)
+        thread = threading.Thread(target=_async_analysis)
+        thread.daemon = True
+        thread.start()
+        print(f"[BIAS ANALYSIS] Started async analysis thread for article: {article_obj.id}")
+
     def generate_newsletter_content(self, user_interests: List[str], articles: List[Dict]) -> Optional[str]:
         """Generate personalized newsletter content based on user interests and articles"""
         if not articles:

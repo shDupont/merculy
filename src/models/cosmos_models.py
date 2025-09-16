@@ -71,6 +71,7 @@ class CosmosNewsArticle:
             self.political_bias = article_data.get('political_bias')
             self.published_at = article_data.get('published_at')
             self.created_at = article_data.get('created_at')
+            self.bias_analysis_status = article_data.get('bias_analysis_status', 'not_eligible')
         else:
             self.id = None
             self.title = None
@@ -84,6 +85,7 @@ class CosmosNewsArticle:
             self.political_bias = None
             self.published_at = None
             self.created_at = None
+            self.bias_analysis_status = 'not_eligible'
     
     def to_dict(self):
         """Convert news article to dictionary for API responses"""
@@ -99,7 +101,8 @@ class CosmosNewsArticle:
             'image_url': self.image_url,
             'political_bias': self.political_bias,
             'published_at': self.published_at,
-            'created_at': self.created_at
+            'created_at': self.created_at,
+            'bias_analysis_status': self.bias_analysis_status
         }
     
     def to_cosmos_dict(self):
@@ -117,7 +120,59 @@ class CosmosNewsArticle:
             'political_bias': self.political_bias,
             'published_at': self.published_at,
             'created_at': self.created_at,
+            'bias_analysis_status': self.bias_analysis_status,
             'type': 'news_article'
+        }
+
+
+class CosmosRelatedSource:
+    """Related Source model for political bias analysis"""
+    
+    def __init__(self, source_data=None):
+        if source_data:
+            self.id = source_data.get('id')
+            self.article_id = source_data.get('article_id')
+            self.title = source_data.get('title')
+            self.political_bias = source_data.get('political_bias')
+            self.published_at = source_data.get('published_at')
+            self.news_quote = source_data.get('news_quote')
+            self.source = source_data.get('source')
+            self.created_at = source_data.get('created_at')
+        else:
+            self.id = None
+            self.article_id = None
+            self.title = None
+            self.political_bias = None
+            self.published_at = None
+            self.news_quote = None
+            self.source = None
+            self.created_at = None
+    
+    def to_dict(self):
+        """Convert related source to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'article_id': self.article_id,
+            'title': self.title,
+            'political_bias': self.political_bias,
+            'published_at': self.published_at,
+            'news_quote': self.news_quote,
+            'source': self.source,
+            'created_at': self.created_at
+        }
+    
+    def to_cosmos_dict(self):
+        """Convert related source to dictionary for Cosmos DB storage"""
+        return {
+            'id': self.id,
+            'article_id': self.article_id,
+            'title': self.title,
+            'political_bias': self.political_bias,
+            'published_at': self.published_at,
+            'news_quote': self.news_quote,
+            'source': self.source,
+            'created_at': self.created_at,
+            'type': 'related_source'
         }
 
 
@@ -266,6 +321,45 @@ class NewsArticleService:
             return []
 
 
+class RelatedSourceService:
+    """Service class for managing related sources in Cosmos DB"""
+    
+    def __init__(self):
+        self.cosmos_service = CosmosService()
+    
+    def create_related_source(self, article_id, title, political_bias, published_at, news_quote, source):
+        """Create a new related source"""
+        try:
+            source_data = {
+                'article_id': str(article_id),
+                'title': title,
+                'political_bias': political_bias,
+                'published_at': published_at,
+                'news_quote': news_quote,
+                'source': source,
+                'created_at': datetime.utcnow().isoformat()
+            }
+            
+            cosmos_source = self.cosmos_service.create_related_source(source_data)
+            if cosmos_source:
+                return CosmosRelatedSource(cosmos_source)
+            return None
+            
+        except Exception as e:
+            print(f"Error creating related source: {e}")
+            return None
+    
+    def get_related_sources_by_article(self, article_id):
+        """Get related sources for a specific article"""
+        try:
+            cosmos_sources = self.cosmos_service.get_related_sources_by_article(str(article_id))
+            return [CosmosRelatedSource(source) for source in cosmos_sources]
+        except Exception as e:
+            print(f"Error getting related sources by article: {e}")
+            return []
+
+
 # Global instances
 newsletter_service = NewsletterService()
 news_article_service = NewsArticleService()
+related_source_service = RelatedSourceService()

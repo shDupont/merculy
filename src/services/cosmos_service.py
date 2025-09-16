@@ -54,6 +54,10 @@ class CosmosService:
                 'partition_key': PartitionKey(path="/user_id"),
             },
             {
+                'id': 'related_sources',
+                'partition_key': PartitionKey(path="/article_id"),
+            },
+            {
                 'id': 'newsConf',
                 'partition_key': PartitionKey(path="/id"),
             }
@@ -463,6 +467,74 @@ class CosmosService:
         except Exception as e:
             print(f"Error counting newsletters by topic from Cosmos DB: {e}")
             return 0
+    
+    # Related sources operations
+    def create_related_source(self, source_data):
+        """Create a related source in Cosmos DB"""
+        if not self.is_available():
+            return None
+        
+        try:
+            container = self.database.get_container_client('related_sources')
+            source_doc = {
+                'id': f"{source_data['article_id']}_{datetime.utcnow().timestamp()}",
+                'article_id': source_data['article_id'],
+                'title': source_data['title'],
+                'political_bias': source_data['political_bias'],
+                'published_at': source_data['published_at'],
+                'news_quote': source_data['news_quote'],
+                'source': source_data['source'],
+                'created_at': datetime.utcnow().isoformat(),
+                'type': 'related_source'
+            }
+            
+            return container.create_item(body=source_doc)
+        except Exception as e:
+            print(f"Error creating related source in Cosmos DB: {e}")
+            return None
+    
+    def get_related_sources_by_article(self, article_id):
+        """Get related sources for a specific article"""
+        if not self.is_available():
+            return []
+        
+        try:
+            container = self.database.get_container_client('related_sources')
+            query = "SELECT * FROM c WHERE c.article_id = @article_id AND c.type = 'related_source'"
+            items = list(container.query_items(
+                query=query,
+                parameters=[{"name": "@article_id", "value": str(article_id)}],
+                partition_key=str(article_id)
+            ))
+            return items
+        except Exception as e:
+            print(f"Error getting related sources from Cosmos DB: {e}")
+            return []
+    
+    def update_article_bias_status(self, article_id, status):
+        """Update the bias analysis status of an article"""
+        if not self.is_available():
+            return None
+        
+        try:
+            # First get the article
+            article = self.get_news_article_by_id(article_id)
+            if not article:
+                return None
+            
+            # Update the status
+            article['bias_analysis_status'] = status
+            
+            # Replace the item
+            container = self.database.get_container_client('news_articles')
+            updated_item = container.replace_item(
+                item=article_id,
+                body=article
+            )
+            return updated_item
+        except Exception as e:
+            print(f"Error updating article bias status in Cosmos DB: {e}")
+            return None
         
 # Global instance
 cosmos_service = CosmosService()
