@@ -419,6 +419,7 @@ def generate_newsletter(current_user):
         
         if not news_by_topic:
             return jsonify({'error': 'No news articles found for user interests'}), 404
+            # TODO: nao ta conseguindo gerar mais noticias pois o limite diario foi atingido; tratar erro -> corrigir nome do erro?
         
         if current_user.newsletter_format == 'single':
             # Generate single newsletter with all topics
@@ -548,6 +549,7 @@ def generate_newsletter(current_user):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# TODO: não está retornando as newsletters salvas do usuario
 @news_bp.route('/newsletters', methods=['GET'])
 @jwt_required
 def get_user_newsletters(current_user):
@@ -564,7 +566,8 @@ def get_user_newsletters(current_user):
         
         # Calculate offset for pagination
         limit = per_page
-        all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100, saved=do_get_saved=='true')
+        all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100, saved=do_get_saved)
+        #all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100, saved=do_get_saved=="true")
 
         all_returned_newsletters = []
         for current_news in all_newsletters:
