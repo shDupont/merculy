@@ -14,7 +14,7 @@ class NewsService:
         
         # Topic mapping for Portuguese keywords - will be enhanced by Cosmos DB data
         self.topic_keywords = {
-            'tecnologia': ['tecnologia', 'tech', 'inovação', 'startup', 'digital', 'internet', 'software', 'hardware'],
+            'tecnologia': ['tecnologia', 'tech', 'inovação', 'internet', 'software', 'hardware', 'Inteligência Artificial'],
             'política': ['política', 'governo', 'eleições', 'congresso', 'senado', 'deputado', 'presidente'],
             'economia': ['economia', 'mercado', 'bolsa', 'dólar', 'inflação', 'PIB', 'juros', 'banco'],
             'esportes': ['futebol', 'esporte', 'copa', 'olimpíadas', 'jogos', 'atleta', 'campeonato'],
@@ -164,7 +164,6 @@ class NewsService:
         Returns:
             Dictionary with topic as key and list of articles as value
         """
-        print(f"[MULTIPLE_TOPICS] Starting with topics: {topics}, limit: {limit}, user_channels: {user_channels}")
         
         if not topics:
             print("[MULTIPLE_TOPICS] No topics provided - returning empty dict")
@@ -172,7 +171,6 @@ class NewsService:
         
         # Simple equal division: divide total limit by number of topics
         articles_per_topic = limit // len(topics)
-        print(f"[MULTIPLE_TOPICS] Articles per topic: {articles_per_topic}")
         
         news_by_topic = {}
         
@@ -181,8 +179,6 @@ class NewsService:
             # Calculate limit for this topic (distribute remainder to first topics)
             topic_limit = articles_per_topic
 
-            print(f"[MULTIPLE_TOPICS] Processing topic '{topic}' with limit: {topic_limit}")
-            
             # Get articles for this topic
             topic_articles = self.get_news_by_topic(
                 topic=topic,
@@ -200,7 +196,7 @@ class NewsService:
         print(f"[MULTIPLE_TOPICS] Final result: {len(news_by_topic)} topics with articles")
         return news_by_topic
     
-    def get_news_by_interests(self, user, limit: int = 20) -> Dict[str, List[Dict]]:
+    def get_news_by_interests(self, user, limit: int = 20, topic: str = '') -> Dict[str, List[Dict]]:
         """
         Get news articles based on current user's interests using multiple topics approach
         
@@ -212,7 +208,10 @@ class NewsService:
             Dictionary with topic as key and list of articles as value
         """
         # Get user's interests
-        user_interests = user.get_interests()
+        if topic != '':
+            user_interests = [topic]
+        else:
+            user_interests = user.get_interests()
 
         print(f"[INTERESTS] User interests: {user_interests}")
         print(f"[INTERESTS] User type: {type(user)}")

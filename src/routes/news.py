@@ -392,6 +392,7 @@ def generate_newsletter(current_user):
     """Generate personalized newsletter for current user based on article references"""
     try:        
         # Get user interests
+        topic = request.args.get('topic', '')
         user_interests = current_user.get_interests()
         if not user_interests:
             user_interests = ['tecnologia', 'política', 'economia']  # Default interests
@@ -415,7 +416,7 @@ def generate_newsletter(current_user):
             user_channels = channel_domains if channel_domains else None
         
         # Get news for user interests using the updated method
-        news_by_topic = news_service.get_news_by_interests(current_user, limit=25)
+        news_by_topic = news_service.get_news_by_interests(current_user, limit=25, topic=topic)
         
         if not news_by_topic:
             return jsonify({'error': 'No news articles found for user interests'}), 404
@@ -436,6 +437,10 @@ def generate_newsletter(current_user):
                         if summary:
                             article['summary'] = summary
                         
+                        # Analyze political bias
+                        bias = gemini_service.analyze_political_bias(article['title'], article['content'])
+                        article['political_bias'] = bias
+
                         # Generate bullet point highlights
                         bullet_highlights = gemini_service.generate_bullet_point_highlights(article['title'], article['content'][:400])
                         if bullet_highlights:
