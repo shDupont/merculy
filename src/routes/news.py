@@ -456,6 +456,7 @@ def generate_newsletter(current_user):
                             topic=article.get('topic', 'geral'),
                             image_url=article.get('image_url', ''),
                             summary=article.get('summary'),
+                            bullet_point_highlights=article.get('bullet_point_highlights'),
                             political_bias=article.get('political_bias'),
                             published_at=article.get('published_at')
                         )
@@ -590,12 +591,15 @@ def get_user_newsletters(current_user):
         
         # Calculate offset for pagination
         limit = per_page
-        all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100, saved=do_get_saved)
-        #all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100, saved=do_get_saved=="true")
+        all_newsletters = newsletter_service.get_user_newsletters(current_user.id, limit=100, saved=do_get_saved=="true")
+
+        print(f"[NEWSLETTERS] all")
+        print(all_newsletters)
 
         all_returned_newsletters = []
         for current_news in all_newsletters:
             if(topic != ''):
+                print(f"[NEWSLETTER] News Topic is {current_news.topic}")
                 if(current_news.topic == topic):
                     all_returned_newsletters.append(
                         current_news.to_dict()
