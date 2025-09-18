@@ -484,6 +484,7 @@ class CosmosService:
                 'published_at': source_data['published_at'],
                 'news_quote': source_data['news_quote'],
                 'source': source_data['source'],
+                'url': source_data.get('url', ''),
                 'created_at': datetime.utcnow().isoformat(),
                 'type': 'related_source'
             }

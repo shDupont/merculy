@@ -137,6 +137,7 @@ class CosmosRelatedSource:
             self.published_at = source_data.get('published_at')
             self.news_quote = source_data.get('news_quote')
             self.source = source_data.get('source')
+            self.url = source_data.get('url')
             self.created_at = source_data.get('created_at')
         else:
             self.id = None
@@ -146,6 +147,7 @@ class CosmosRelatedSource:
             self.published_at = None
             self.news_quote = None
             self.source = None
+            self.url = None
             self.created_at = None
     
     def to_dict(self):
@@ -158,6 +160,7 @@ class CosmosRelatedSource:
             'published_at': self.published_at,
             'news_quote': self.news_quote,
             'source': self.source,
+            'url': self.url,
             'created_at': self.created_at
         }
     
@@ -171,6 +174,7 @@ class CosmosRelatedSource:
             'published_at': self.published_at,
             'news_quote': self.news_quote,
             'source': self.source,
+            'url': self.url,
             'created_at': self.created_at,
             'type': 'related_source'
         }
@@ -327,7 +331,7 @@ class RelatedSourceService:
     def __init__(self):
         self.cosmos_service = CosmosService()
     
-    def create_related_source(self, article_id, title, political_bias, published_at, news_quote, source):
+    def create_related_source(self, article_id, title, political_bias, published_at, news_quote, source, url=None):
         """Create a new related source"""
         try:
             source_data = {
@@ -337,6 +341,7 @@ class RelatedSourceService:
                 'published_at': published_at,
                 'news_quote': news_quote,
                 'source': source,
+                'url': url or '',
                 'created_at': datetime.utcnow().isoformat()
             }
             

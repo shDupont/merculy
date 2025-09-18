@@ -14,19 +14,14 @@ class NewsService:
         
         # Topic mapping for Portuguese keywords - will be enhanced by Cosmos DB data
         self.topic_keywords = {
-            'tecnologia': ['tecnologia', 'tech', 'inovação', 'internet', 'software', 'hardware', 'Inteligência Artificial'],
-            'política': ['política', 'governo', 'eleições', 'congresso', 'senado', 'deputado', 'presidente'],
+            'tecnologia-inovação': ['tecnologia', 'tech', 'inovação', 'internet', 'software', 'hardware', 'Inteligência Artificial'],
+            'politica-país': ['política', 'governo', 'eleições', 'congresso', 'senado', 'deputado', 'presidente'],
             'economia': ['economia', 'mercado', 'bolsa', 'dólar', 'inflação', 'PIB', 'juros', 'banco'],
             'esportes': ['futebol', 'esporte', 'copa', 'olimpíadas', 'jogos', 'atleta', 'campeonato'],
             'saúde': ['saúde', 'medicina', 'hospital', 'doença', 'vacina', 'tratamento', 'médico'],
-            'ciência': ['ciência', 'pesquisa', 'estudo', 'descoberta', 'universidade', 'científico'],
-            'entretenimento': ['cinema', 'música', 'teatro', 'celebridade', 'filme', 'show', 'artista'],
-            'negócios': ['negócios', 'empresa', 'corporação', 'CEO', 'investimento', 'lucro', 'receita'],
-            'educação': ['educação', 'escola', 'universidade', 'ensino', 'professor', 'estudante', 'MEC'],
-            'meio ambiente': ['meio ambiente', 'sustentabilidade', 'clima', 'aquecimento global', 'poluição', 'natureza'],
-            'meio-ambiente': ['meio ambiente', 'sustentabilidade', 'clima', 'aquecimento global', 'poluição', 'natureza'],
+            'sustentabilidade': ['meio ambiente', 'sustentabilidade', 'clima', 'aquecimento global', 'poluição', 'natureza'],
             'arte-cultura': ['arte', 'cultura', 'música', 'teatro', 'cinema', 'literatura', 'exposição', 'festival'],
-            'mercado-trabalho': ['emprego', 'trabalho', 'carreira', 'vaga', 'concurso', 'desemprego', 'RH', 'profissional']
+            'mercado-trabalho': ['vaga', 'concurso', 'desemprego', 'RH']
         }
     
     def is_available(self):

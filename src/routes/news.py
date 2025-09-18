@@ -396,6 +396,8 @@ def generate_newsletter(current_user):
         user_interests = current_user.get_interests()
         if not user_interests:
             user_interests = ['tecnologia', 'política', 'economia']  # Default interests
+        if topic != '':
+            user_interests = [ topic ]
         
         # Get user's followed channels
         user_channels = current_user.get_followed_channels()

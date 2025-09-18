@@ -181,7 +181,8 @@ class GeminiService:
                             political_bias=bias,
                             published_at=related_article.get('published_at', ''),
                             news_quote=news_quote,
-                            source=related_article.get('source', '')
+                            source=related_article.get('source', ''),
+                            url=related_article.get('url', '')
                         )
                         
                         if related_source:
